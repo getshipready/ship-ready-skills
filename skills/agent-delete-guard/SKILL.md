@@ -88,4 +88,4 @@ Checkpoint made, rule file added, deny list added (if the tool supports it), age
 Rotating keys, changing provider dashboards, restoring production backups, applying production migrations and deploying are done by the human. Prepare the exact steps and wait for confirmation.
 
 ---
-Part of the free [Ship-Ready Lite](https://getshipready.vercel.app/lite) library. Want this done as a team? The **Ship-Ready Crew** has **Medic**, a specialist agent for debugging & code health, plus a lead agent, a 59-check scanner and an Excel ship score: https://getshipready.vercel.app/crew
+Part of the free [Ship-Ready Lite](https://getshipready.github.io/lite/) library. Want this done as a team? The **Ship-Ready Crew** has **Medic**, a specialist agent for debugging & code health, plus a lead agent, a 59-check scanner and an Excel ship score: https://getshipready.github.io/crew/

@@ -61,4 +61,4 @@ Migration file + rollback + two-user test results.
 Rotating keys, changing provider dashboards, applying production migrations, deploying and charging cards are done by the human. Prepare the exact steps and wait for confirmation.
 
 ---
-Part of the free [Ship-Ready Lite](https://getshipready.vercel.app/lite) library. Want this done as a team? The **Ship-Ready Crew** has **Warden**, a specialist agent for supabase & data, plus a lead agent, a 59-check scanner and an Excel ship score: https://getshipready.vercel.app/crew
+Part of the free [Ship-Ready Lite](https://getshipready.github.io/lite/) library. Want this done as a team? The **Ship-Ready Crew** has **Warden**, a specialist agent for supabase & data, plus a lead agent, a 59-check scanner and an Excel ship score: https://getshipready.github.io/crew/

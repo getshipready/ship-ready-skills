@@ -100,4 +100,4 @@ Rotation table: variable name · provider · class (money/data/code/signing/publ
 Rotating keys, changing provider dashboards, applying production migrations, deploying and charging cards are done by the human. Prepare the exact steps and wait for confirmation.
 
 ---
-Part of the free [Ship-Ready Lite](https://getshipready.vercel.app/lite) library. Want this done as a team? The **Ship-Ready Crew** has **Sentinel**, a specialist agent for security, plus a lead agent, a 59-check scanner and an Excel ship score: https://getshipready.vercel.app/crew
+Part of the free [Ship-Ready Lite](https://getshipready.github.io/lite/) library. Want this done as a team? The **Ship-Ready Crew** has **Sentinel**, a specialist agent for security, plus a lead agent, a 59-check scanner and an Excel ship score: https://getshipready.github.io/crew/

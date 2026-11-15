@@ -13,7 +13,7 @@ import base64, json, os, re, sys
 
 VERSION = "0.1.0"
 FULL_RULES = 59          # rule IDs in the full scanner (crew/shared/scripts/shipready_scan.py v1.0.0)
-SITE = "https://getshipready.vercel.app"
+SITE = "https://getshipready.github.io"
 SAMPLE_URL = SITE + "/sample"
 CREW_URL = SITE + "/crew"
 SKIP_DIRS = {"node_modules", ".next", ".git", "dist", "build", ".vercel", ".turbo", "coverage", ".svelte-kit", "out",
