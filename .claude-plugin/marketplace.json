@@ -1,0 +1,204 @@
+{
+  "name": "ship-ready",
+  "owner": {
+    "name": "Ship-Ready",
+    "url": "https://getshipready.github.io"
+  },
+  "metadata": {
+    "description": "Free skills that take vibe-coded apps from 'it works' to 'safe to launch'.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "ship-ready-lite",
+      "description": "All 53 Ship-Ready Lite skills + the start-here router: security, Supabase RLS, auth, Stripe, deploy, performance, debugging and launch for vibe-coded apps.",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "security",
+      "skills": [
+        "./skills/ship-ready-start-here",
+        "./skills/ship-ready-quick-scan",
+        "./skills/secret-leak-check",
+        "./skills/leaked-key-rotation",
+        "./skills/public-env-audit",
+        "./skills/xss-sanitize",
+        "./skills/security-headers",
+        "./skills/api-rate-limit",
+        "./skills/dependency-audit",
+        "./skills/ssrf-url-fetch-guard",
+        "./skills/rls-quick-check",
+        "./skills/rls-policy-writer",
+        "./skills/mass-delete-guard",
+        "./skills/storage-bucket-lockdown",
+        "./skills/service-role-split",
+        "./skills/schema-to-migrations",
+        "./skills/backups-and-restore",
+        "./skills/edge-function-auth",
+        "./skills/teams-multitenant-rls",
+        "./skills/protect-routes-nextjs",
+        "./skills/auth-redirect-urls",
+        "./skills/oauth-callback-fix",
+        "./skills/email-deliverability-smtp",
+        "./skills/admin-role-setup",
+        "./skills/session-bugs",
+        "./skills/stripe-webhook-verify",
+        "./skills/stripe-checkout-server",
+        "./skills/entitlements-table",
+        "./skills/stripe-subscription-lifecycle",
+        "./skills/stripe-go-live",
+        "./skills/usage-credits-billing",
+        "./skills/env-var-inventory",
+        "./skills/vercel-build-fix",
+        "./skills/spa-hosting-rewrites",
+        "./skills/custom-domain-setup",
+        "./skills/preview-vs-prod",
+        "./skills/rollback-plan",
+        "./skills/error-and-uptime-alerts",
+        "./skills/n-plus-one-fix",
+        "./skills/index-advisor",
+        "./skills/bundle-diet",
+        "./skills/image-optimization",
+        "./skills/lighthouse-triage",
+        "./skills/bug-repro-first",
+        "./skills/ai-loop-breaker",
+        "./skills/agent-delete-guard",
+        "./skills/typescript-errors-fix",
+        "./skills/add-regression-tests",
+        "./skills/refactor-giant-component",
+        "./skills/export-and-run-locally",
+        "./skills/seo-metadata",
+        "./skills/legal-pages-draft",
+        "./skills/analytics-and-funnel",
+        "./skills/launch-post-drafts",
+        "./skills/transactional-email-setup"
+      ]
+    },
+    {
+      "name": "ship-ready-security",
+      "description": "Ship-Ready Lite \u00b7 Security only (8 skills).",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "skills": [
+        "./skills/ship-ready-quick-scan",
+        "./skills/secret-leak-check",
+        "./skills/leaked-key-rotation",
+        "./skills/public-env-audit",
+        "./skills/xss-sanitize",
+        "./skills/security-headers",
+        "./skills/api-rate-limit",
+        "./skills/dependency-audit",
+        "./skills/ssrf-url-fetch-guard"
+      ]
+    },
+    {
+      "name": "ship-ready-supabase",
+      "description": "Ship-Ready Lite \u00b7 Supabase & data only (9 skills).",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "skills": [
+        "./skills/rls-quick-check",
+        "./skills/rls-policy-writer",
+        "./skills/mass-delete-guard",
+        "./skills/storage-bucket-lockdown",
+        "./skills/service-role-split",
+        "./skills/schema-to-migrations",
+        "./skills/backups-and-restore",
+        "./skills/edge-function-auth",
+        "./skills/teams-multitenant-rls"
+      ]
+    },
+    {
+      "name": "ship-ready-auth",
+      "description": "Ship-Ready Lite \u00b7 Auth only (6 skills).",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "skills": [
+        "./skills/protect-routes-nextjs",
+        "./skills/auth-redirect-urls",
+        "./skills/oauth-callback-fix",
+        "./skills/email-deliverability-smtp",
+        "./skills/admin-role-setup",
+        "./skills/session-bugs"
+      ]
+    },
+    {
+      "name": "ship-ready-payments",
+      "description": "Ship-Ready Lite \u00b7 Payments only (6 skills).",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "skills": [
+        "./skills/stripe-webhook-verify",
+        "./skills/stripe-checkout-server",
+        "./skills/entitlements-table",
+        "./skills/stripe-subscription-lifecycle",
+        "./skills/stripe-go-live",
+        "./skills/usage-credits-billing"
+      ]
+    },
+    {
+      "name": "ship-ready-deploy",
+      "description": "Ship-Ready Lite \u00b7 Deploy & ops only (7 skills).",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "skills": [
+        "./skills/env-var-inventory",
+        "./skills/vercel-build-fix",
+        "./skills/spa-hosting-rewrites",
+        "./skills/custom-domain-setup",
+        "./skills/preview-vs-prod",
+        "./skills/rollback-plan",
+        "./skills/error-and-uptime-alerts"
+      ]
+    },
+    {
+      "name": "ship-ready-performance",
+      "description": "Ship-Ready Lite \u00b7 Performance only (5 skills).",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "skills": [
+        "./skills/n-plus-one-fix",
+        "./skills/index-advisor",
+        "./skills/bundle-diet",
+        "./skills/image-optimization",
+        "./skills/lighthouse-triage"
+      ]
+    },
+    {
+      "name": "ship-ready-debugging",
+      "description": "Ship-Ready Lite \u00b7 Debugging & code health only (7 skills).",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "skills": [
+        "./skills/bug-repro-first",
+        "./skills/ai-loop-breaker",
+        "./skills/agent-delete-guard",
+        "./skills/typescript-errors-fix",
+        "./skills/add-regression-tests",
+        "./skills/refactor-giant-component",
+        "./skills/export-and-run-locally"
+      ]
+    },
+    {
+      "name": "ship-ready-launch",
+      "description": "Ship-Ready Lite \u00b7 Launch only (5 skills).",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "skills": [
+        "./skills/seo-metadata",
+        "./skills/legal-pages-draft",
+        "./skills/analytics-and-funnel",
+        "./skills/launch-post-drafts",
+        "./skills/transactional-email-setup"
+      ]
+    }
+  ]
+}

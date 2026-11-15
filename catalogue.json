@@ -1,0 +1,320 @@
+[
+  {
+    "name": "secret-leak-check",
+    "title": "Secret leak check",
+    "category": "Security",
+    "description": "Find API keys, service-role keys and tokens committed to an AI-built repo or shipped in the frontend bundle, and produce a rotation list. Use when asked 'did I leak my keys?', before making a repo public, or after a builder pasted keys into code."
+  },
+  {
+    "name": "leaked-key-rotation",
+    "title": "Rotate leaked keys fast",
+    "category": "Security",
+    "description": "Rotate leaked API keys fast without breaking production: triage every secret that sat in the leaked place, cap spend with no deploy, revoke and reissue at each provider (OpenAI, Anthropic, OpenRouter, Stripe, Supabase, GitHub), update host env vars, redeploy, prove the old key is dead and check usage and billing since the leak. Use when a host, repo, log or chat exposed your env vars, a provider emailed you about a leaked key, or an AI bill spiked."
+  },
+  {
+    "name": "public-env-audit",
+    "title": "Public env var audit",
+    "category": "Security",
+    "description": "Audit NEXT_PUBLIC_, VITE_, EXPO_PUBLIC_ and REACT_APP_ variables to make sure no secret is compiled into the browser bundle. Use when setting up env vars, after a builder created a 'NEXT_PUBLIC_..._SECRET', or before deploying."
+  },
+  {
+    "name": "xss-sanitize",
+    "title": "Stop stored XSS",
+    "category": "Security",
+    "description": "Find and fix places where user-generated content is rendered as HTML (dangerouslySetInnerHTML, v-html, innerHTML, markdown with raw HTML). Use when an app shows user comments, notes, bios, rich text or AI output as HTML."
+  },
+  {
+    "name": "security-headers",
+    "title": "Security headers",
+    "category": "Security",
+    "description": "Add Content-Security-Policy, HSTS, frame-ancestors, nosniff and Referrer-Policy to a Next.js, Vite or static app on Vercel or Netlify without breaking Supabase, Stripe or analytics. Use before launch or when a scanner flags missing headers."
+  },
+  {
+    "name": "api-rate-limit",
+    "title": "Rate-limit expensive endpoints",
+    "category": "Security",
+    "description": "Protect login, signup, AI/LLM, email/SMS and other costly endpoints with per-user or per-IP rate limits and input caps so nobody can burn your credits or spam your users. Use for any route that calls OpenAI/Anthropic, sends email, or does heavy work."
+  },
+  {
+    "name": "dependency-audit",
+    "title": "Dependency audit",
+    "category": "Security",
+    "description": "Find and fix vulnerable or abandoned npm packages in production dependencies without breaking the app, including Next.js security patches. Use before launch, monthly, or when GitHub/Dependabot raises alerts."
+  },
+  {
+    "name": "ssrf-url-fetch-guard",
+    "title": "Guard URL-fetching features (SSRF)",
+    "category": "Security",
+    "description": "Secure features that fetch a user-supplied URL (link previews, import from URL, webhooks you call, AI browsing) against SSRF and internal network access. Use when the app downloads or calls URLs that users provide."
+  },
+  {
+    "name": "rls-quick-check",
+    "title": "Supabase RLS quick check",
+    "category": "Supabase & data",
+    "description": "Five-minute check of a Supabase project's Row Level Security: which tables have RLS off, which policies are 'using (true)', which updates lack WITH CHECK, and which buckets are public. Use on any Lovable/Bolt/Supabase app before launch or when 'users can see each other's data'."
+  },
+  {
+    "name": "rls-policy-writer",
+    "title": "RLS policy writer",
+    "category": "Supabase & data",
+    "description": "Write correct Supabase RLS policies for common access models: owner-only, public-read/owner-write, admin, team/multi-tenant, and server-only tables, with WITH CHECK, explicit Data API grants (required for new tables from Oct 30, 2026), indexes and a rollback. Use when you need to add or fix policies."
+  },
+  {
+    "name": "mass-delete-guard",
+    "title": "Mass-delete guard",
+    "category": "Supabase & data",
+    "description": "Stop one user, bug or leaked key from wiping a Supabase/Postgres table, and recover fast if it already happened: incident steps, delete audit log, soft delete, owner-only delete policies and a delete rate limit. Use after a mass-delete incident or before launch with real user data."
+  },
+  {
+    "name": "storage-bucket-lockdown",
+    "title": "Storage bucket lockdown",
+    "category": "Supabase & data",
+    "description": "Make Supabase Storage buckets private where needed, add per-user folder policies, and switch the app to signed URLs. Use when files like invoices, exports, uploads or documents sit in public buckets."
+  },
+  {
+    "name": "service-role-split",
+    "title": "Split browser and server Supabase clients",
+    "category": "Supabase & data",
+    "description": "Remove the Supabase service_role key from browser code and split into a browser client (anon key + session) and a server-only admin client. Use when the app 'only works with the service key', or a scanner finds service_role in client code."
+  },
+  {
+    "name": "schema-to-migrations",
+    "title": "Capture a dashboard-built schema as migrations",
+    "category": "Supabase & data",
+    "description": "Turn a Supabase project built through Lovable, Bolt or the dashboard into versioned SQL migrations so changes are reviewable, reproducible and testable on a branch. Use before hardening RLS or adding a staging environment."
+  },
+  {
+    "name": "backups-and-restore",
+    "title": "Backups and restore drill",
+    "category": "Supabase & data",
+    "description": "Make sure a Supabase/Postgres app can recover from deleted data or a bad migration: check the backup plan, add a logical export, and run a restore drill. Use before launch and before risky migrations."
+  },
+  {
+    "name": "edge-function-auth",
+    "title": "Secure Supabase Edge Functions",
+    "category": "Supabase & data",
+    "description": "Make Supabase Edge Functions verify the caller's JWT, check roles, use secrets correctly and handle CORS, especially in Lovable/Bolt SPAs where Edge Functions are the only server code. Use when adding privileged actions to an SPA."
+  },
+  {
+    "name": "teams-multitenant-rls",
+    "title": "Teams / multi-tenant RLS",
+    "category": "Supabase & data",
+    "description": "Add organizations or teams to a Supabase app with membership-based RLS, roles per team, invitations and safe switching between workspaces. Use when moving from single-user to team accounts or when data leaks across workspaces."
+  },
+  {
+    "name": "protect-routes-nextjs",
+    "title": "Protect routes in Next.js + Supabase",
+    "category": "Auth",
+    "description": "Add real server-side protection to pages and API routes in a Next.js App Router app using @supabase/ssr middleware and getUser(), replacing client-only redirects. Use when private pages flash then redirect, or API routes don't check the user."
+  },
+  {
+    "name": "auth-redirect-urls",
+    "title": "Fix auth redirect URLs",
+    "category": "Auth",
+    "description": "Fix Supabase/Clerk/Auth.js login, magic-link, OAuth and password-reset redirects that point at localhost or the wrong domain after deploying. Use when 'the email link goes to localhost:3000' or OAuth fails on production or preview URLs."
+  },
+  {
+    "name": "oauth-callback-fix",
+    "title": "Fix the OAuth / PKCE callback",
+    "category": "Auth",
+    "description": "Implement or repair the /auth/callback route that exchanges the code for a session with Supabase PKCE in Next.js, fixing 'auth session missing', loops and blank pages after Google/GitHub login. Use when OAuth or magic links log in but the session doesn't stick."
+  },
+  {
+    "name": "email-deliverability-smtp",
+    "title": "Auth emails that actually arrive",
+    "category": "Auth",
+    "description": "Move Supabase auth emails off the default rate-limited sender to custom SMTP (Resend, Postmark, SES) with SPF, DKIM and DMARC, and brand the templates. Use when signup or reset emails are slow, missing, or in spam."
+  },
+  {
+    "name": "admin-role-setup",
+    "title": "Admin role done right",
+    "category": "Auth",
+    "description": "Implement admin/staff roles safely: role stored server-side, users unable to promote themselves, admin checks on the server and in RLS. Use when there's an admin panel, or role/is_admin lives on a user-editable profile row."
+  },
+  {
+    "name": "session-bugs",
+    "title": "Debug login/session bugs",
+    "category": "Auth",
+    "description": "Diagnose 'logged out randomly', 'user is null on first load', hydration mismatches and stale sessions in Supabase/Next.js or SPA apps with a structured checklist. Use when auth works sometimes but not always."
+  },
+  {
+    "name": "stripe-webhook-verify",
+    "title": "Verify Stripe webhooks",
+    "category": "Payments",
+    "description": "Make a Stripe webhook endpoint verify signatures with the raw body, handle retries idempotently and return fast. Use when the webhook trusts the JSON body, has no signing secret, or events get processed twice."
+  },
+  {
+    "name": "stripe-checkout-server",
+    "title": "Server-side Stripe Checkout",
+    "category": "Payments",
+    "description": "Create Stripe Checkout sessions on the server with fixed Price IDs, the logged-in user's id and correct success/cancel URLs, never trusting prices or user ids from the browser. Use when checkout takes amount/price from the client or can't link payments to users."
+  },
+  {
+    "name": "entitlements-table",
+    "title": "Entitlements: who has access",
+    "category": "Payments",
+    "description": "Model paid access with an entitlements/subscriptions table written only by the Stripe webhook and read by the app and RLS, replacing client-set is_pro flags. Use when 'is_pro' is set from the success page or the browser."
+  },
+  {
+    "name": "stripe-subscription-lifecycle",
+    "title": "Subscription lifecycle",
+    "category": "Payments",
+    "description": "Handle the full subscription lifecycle: trials, upgrades/downgrades, failed payments, cancellations and the Stripe Customer Portal. Use when adding subscriptions or when cancelled users keep access."
+  },
+  {
+    "name": "stripe-go-live",
+    "title": "Stripe test \u2192 live checklist",
+    "category": "Payments",
+    "description": "Switch a Stripe integration from test to live mode safely: live keys, live webhook endpoint and secret, live Price IDs, tax, receipts and a real-card test. Use the day you start charging."
+  },
+  {
+    "name": "usage-credits-billing",
+    "title": "Credits for AI usage",
+    "category": "Payments",
+    "description": "Implement prepaid credits or usage limits for AI features with an atomic ledger, so users can't overspend or race the counter. Use when charging per generation, per token or per export."
+  },
+  {
+    "name": "env-var-inventory",
+    "title": "Env var inventory per environment",
+    "category": "Deploy & ops",
+    "description": "Build a complete inventory of environment variables across local, preview and production (Vercel, Netlify, Supabase secrets), fix missing ones and write .env.example. Use when 'it works locally but not on Vercel' or before the first deploy."
+  },
+  {
+    "name": "vercel-build-fix",
+    "title": "Fix a failing Vercel build",
+    "category": "Deploy & ops",
+    "description": "Diagnose and fix Vercel/Netlify build failures in AI-generated Next.js or Vite apps: type errors, ESLint, missing env vars, Node version, case-sensitive imports, lockfile mismatches. Use when the deploy fails but local dev works."
+  },
+  {
+    "name": "spa-hosting-rewrites",
+    "title": "SPA hosting: 404 on refresh",
+    "category": "Deploy & ops",
+    "description": "Fix 404s on refresh and deep links for Vite/React SPAs (Lovable, Bolt exports) on Vercel, Netlify, Cloudflare Pages or S3 by adding the right rewrites, plus caching headers. Use when routes work by clicking but 404 when refreshed."
+  },
+  {
+    "name": "custom-domain-setup",
+    "title": "Custom domain, HTTPS and redirects",
+    "category": "Deploy & ops",
+    "description": "Connect a custom domain to Vercel/Netlify with correct DNS, HTTPS, www/apex redirect and update every place that stores the old URL (auth, Stripe, OAuth, emails). Use when moving from *.vercel.app or *.lovable.app to your own domain."
+  },
+  {
+    "name": "preview-vs-prod",
+    "title": "Separate preview and production",
+    "category": "Deploy & ops",
+    "description": "Stop preview deployments from touching production data and money: separate Supabase projects or branches, Stripe test keys in preview, and protected previews. Use when previews share the production database or live Stripe keys."
+  },
+  {
+    "name": "rollback-plan",
+    "title": "One-page rollback plan",
+    "category": "Deploy & ops",
+    "description": "Write and rehearse how to undo a bad deploy or migration in minutes: instant rollback on the host, reversible migrations, feature flags. Use before launch day or a risky release."
+  },
+  {
+    "name": "error-and-uptime-alerts",
+    "title": "Errors and uptime alerts",
+    "category": "Deploy & ops",
+    "description": "Add error tracking (Sentry), uptime monitoring and a health endpoint so you hear about outages before users tweet. Use before launch or after a silent failure."
+  },
+  {
+    "name": "n-plus-one-fix",
+    "title": "Fix N+1 queries",
+    "category": "Performance",
+    "description": "Find and fix N+1 query patterns (a query inside a loop or per list item) in Supabase/Prisma apps using joins, embedded selects or batched IN queries. Use when lists are slow or the DB shows thousands of tiny queries."
+  },
+  {
+    "name": "index-advisor",
+    "title": "Add the missing indexes",
+    "category": "Performance",
+    "description": "Find slow Postgres/Supabase queries and add the right indexes (foreign keys, RLS owner columns, sort columns) with EXPLAIN evidence. Use when queries slow down as tables grow or Supabase Performance Advisor warns."
+  },
+  {
+    "name": "bundle-diet",
+    "title": "Bundle diet",
+    "category": "Performance",
+    "description": "Shrink the JavaScript bundle of a Next.js or Vite app: find heavy dependencies (moment, lodash, icon packs, charts), lazy-load below-the-fold components and remove dead code. Use when first load is slow or Lighthouse flags unused JS."
+  },
+  {
+    "name": "image-optimization",
+    "title": "Image optimization",
+    "category": "Performance",
+    "description": "Fix slow images: next/image or responsive srcset, modern formats, correct sizes, lazy loading and priority for the hero, plus Supabase image transforms. Use when LCP is an image or pages ship multi-MB PNGs."
+  },
+  {
+    "name": "lighthouse-triage",
+    "title": "Lighthouse / Core Web Vitals triage",
+    "category": "Performance",
+    "description": "Run Lighthouse or PageSpeed Insights on key pages and turn the report into a short prioritized fix list for LCP, INP and CLS. Use before launch or when the site feels slow."
+  },
+  {
+    "name": "bug-repro-first",
+    "title": "Reproduce before you fix",
+    "category": "Debugging & code health",
+    "description": "Turn a vague bug report ('it doesn't work') into exact reproduction steps, expected vs actual, logs and the smallest failing case before any code change. Use at the start of every bug, especially before asking an AI builder to 'fix it'."
+  },
+  {
+    "name": "ai-loop-breaker",
+    "title": "Break the AI fix loop",
+    "category": "Debugging & code health",
+    "description": "Get out of the loop where an AI builder keeps 'fixing' the same bug and breaking other things: freeze, diff, isolate, write a precise prompt with evidence, and checkpoint. Use when you've asked for the same fix 3+ times."
+  },
+  {
+    "name": "agent-delete-guard",
+    "title": "Keep your AI agent from deleting your work",
+    "category": "Debugging & code health",
+    "description": "Stop your own AI coding agent (Claude Code, Cursor, Codex) from deleting files, code or databases, and get things back when it already has: checkpoint before every session, deny rules, a read-only database role for the agent, and a recovery order. Use before letting an agent run commands, or right after it deleted something."
+  },
+  {
+    "name": "typescript-errors-fix",
+    "title": "Clear TypeScript errors properly",
+    "category": "Debugging & code health",
+    "description": "Fix accumulated TypeScript errors in AI-generated code without `any` spam or ts-ignore: generate Supabase types, fix nullability, and re-enable type checking in builds. Use when tsc shows dozens of errors or builds ignore them."
+  },
+  {
+    "name": "add-regression-tests",
+    "title": "Add a safety net of tests",
+    "category": "Debugging & code health",
+    "description": "Add a minimal, high-value test suite to a vibe-coded app: smoke E2E for signup/login/pay, API auth tests and RLS tests, running in CI. Use before refactors, after a painful bug, or before launch."
+  },
+  {
+    "name": "refactor-giant-component",
+    "title": "Split the 1,000-line component",
+    "category": "Debugging & code health",
+    "description": "Safely split giant AI-generated components or route files into smaller pieces (data hooks, presentational components, utils) without changing behaviour. Use when a file is too big for the AI to edit reliably."
+  },
+  {
+    "name": "export-and-run-locally",
+    "title": "Get your app out of the builder",
+    "category": "Debugging & code health",
+    "description": "Export a Lovable, Bolt, v0 or Replit project to GitHub and run it locally with Cursor/Claude Code: env vars, Supabase connection, scripts, and a sanity build. Use when outgrowing the builder or before a professional review."
+  },
+  {
+    "name": "seo-metadata",
+    "title": "SEO and social metadata",
+    "category": "Launch",
+    "description": "Add titles, descriptions, Open Graph/Twitter images, sitemap.xml, robots.txt and canonical URLs to a Next.js or Vite app, and keep private app pages out of search. Use before launch or when links look blank when shared."
+  },
+  {
+    "name": "legal-pages-draft",
+    "title": "Privacy policy, terms and cookies (draft)",
+    "category": "Launch",
+    "description": "Draft a privacy policy, terms of service and cookie notice that match what the app actually collects and which processors it uses (Supabase, Stripe, analytics, AI APIs). Use before launch; output is a draft for human/legal review, not legal advice."
+  },
+  {
+    "name": "analytics-and-funnel",
+    "title": "Analytics and the signup\u2192paid funnel",
+    "category": "Launch",
+    "description": "Set up privacy-friendly analytics and define 5\u20137 key events (visit, signup, activation, checkout start, paid) so you know where launch traffic drops. Use before launch."
+  },
+  {
+    "name": "launch-post-drafts",
+    "title": "Launch posts that don't flop",
+    "category": "Launch",
+    "description": "Draft launch posts for X, Reddit, Product Hunt, Hacker News and Indie Hackers that follow each community's rules: hook, concrete proof, honest limits, one CTA. Use the week before launch."
+  },
+  {
+    "name": "transactional-email-setup",
+    "title": "Transactional email from your domain",
+    "category": "Launch",
+    "description": "Send product emails (welcome, receipts, notifications) from your own domain with Resend/Postmark, verified DNS, templates and unsubscribe handling. Use when adding any email beyond auth."
+  }
+]

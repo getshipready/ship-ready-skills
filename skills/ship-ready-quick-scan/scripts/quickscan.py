@@ -1,0 +1,267 @@
+#!/usr/bin/env python3
+"""Ship-Ready Quick Scan (free). Standard library only, read-only, runs offline.
+
+Usage:
+  python3 quickscan.py PATH            # scan the app folder at PATH, print the result
+
+Runs 8 checks (10 of the 59 rules) in the full Ship-Ready scanner (Ship-Ready Crew): the ones that
+expose keys, data or money on day one. Same detection logic as the full scanner for these rules.
+What it is not: a penetration test or proof of safety. A clean quick scan means "none of these
+8 checks found anything", nothing more. Secrets are redacted in all output. Nothing is sent anywhere.
+"""
+import base64, json, os, re, sys
+
+VERSION = "0.1.0"
+FULL_RULES = 59          # rule IDs in the full scanner (crew/shared/scripts/shipready_scan.py v1.0.0)
+SITE = "https://getshipready.vercel.app"
+SAMPLE_URL = SITE + "/sample"
+CREW_URL = SITE + "/crew"
+SKIP_DIRS = {"node_modules", ".next", ".git", "dist", "build", ".vercel", ".turbo", "coverage", ".svelte-kit", "out",
+             ".claude", ".cursor", ".agents", "playwright-report", "test-results", ".auth"}
+CODE_EXT = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".vue", ".svelte"}
+TEXT_EXT = CODE_EXT | {".sql", ".json", ".env", ".md", ".html", ".toml", ".yaml", ".yml", ".txt"}
+SEV_ORDER = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+
+# check id -> (title, rule ids, free Lite skill that fixes it)
+CHECKS = [
+    ("secrets", "Committed secrets (API keys, Stripe keys, Supabase service_role JWT)", ["SEC-001"], "secret-leak-check"),
+    ("envignore", ".env kept out of git (.gitignore)", ["SEC-002"], "secret-leak-check"),
+    ("publicenv", "Secrets behind a public env prefix (NEXT_PUBLIC_, VITE_, EXPO_PUBLIC_)", ["SEC-003"], "public-env-audit"),
+    ("rlsoff", "Supabase tables with Row Level Security off (never enabled, or disabled later)", ["RLS-001", "RLS-007"], "rls-quick-check"),
+    ("rlsread", "Supabase read policies open to everyone (`using (true)`)", ["RLS-002"], "rls-policy-writer"),
+    ("rlsview", "Views that skip Row Level Security (no `security_invoker`)", ["RLS-010"], "rls-policy-writer"),
+    ("apiauth", "API routes that skip the caller check", ["AUTH-002", "AUTH-003"], "protect-routes-nextjs"),
+    ("webhook", "Stripe webhook signature verification", ["PAY-001"], "stripe-webhook-verify"),
+]
+
+
+class Repo:
+    def __init__(self, root):
+        self.root = os.path.abspath(root)
+        self.files = {}
+        for d, dirs, fs in os.walk(self.root):
+            dirs[:] = [x for x in dirs if x not in SKIP_DIRS]
+            for f in fs:
+                p = os.path.join(d, f)
+                rel = os.path.relpath(p, self.root)
+                ext = os.path.splitext(f)[1].lower()
+                if ext in TEXT_EXT or f.startswith(".env") or f in (".gitignore", ".nvmrc", "vercel.json"):
+                    try:
+                        if os.path.getsize(p) > 1_500_000:
+                            continue
+                        with open(p, encoding="utf-8", errors="replace") as fh:
+                            self.files[rel] = fh.read()
+                    except OSError:
+                        pass
+
+    def code(self):
+        return {k: v for k, v in self.files.items() if os.path.splitext(k)[1].lower() in CODE_EXT}
+
+    def sql(self):
+        return {k: v for k, v in self.files.items() if k.endswith(".sql")}
+
+
+TEST_RX = re.compile(r"(^|/)(e2e|tests?|__tests__|cypress|playwright)/|\.(spec|test)\.[cm]?[jt]sx?$|(^|/)(playwright|vitest|jest)\.config\.")
+
+
+def is_test_file(rel):
+    return bool(TEST_RX.search(rel.replace(os.sep, "/")))
+
+
+def line_of(text, idx):
+    return text.count("\n", 0, idx) + 1
+
+
+def redact(s):
+    s = s.strip()
+    return s[:6] + "…" + "[redacted]" if len(s) > 10 else "[redacted]"
+
+
+def api_route_files(repo):
+    out = {}
+    for k, v in repo.code().items():
+        r = k.replace(os.sep, "/")
+        if re.search(r"(^|/)app/api/.+/route\.(t|j)sx?$", r) or re.search(r"(^|/)pages/api/", r) \
+           or re.search(r"(^|/)supabase/functions/", r) or re.search(r"(^|/)(server|api)/.+\.(t|j)s$", r):
+            out[k] = v
+    return out
+
+
+AUTH_RX = re.compile(r"auth\.getUser\(|getUser\(|getServerSession|auth\(\)|currentUser\(|getAuth\(|verifyIdToken|jwt\.verify|requireUser|withAuth|clerkClient|getToken\(|validateRequest|lucia|get\w*(?:User|Session)\(|verify\w*Token\(|exchangeOAuthCode|exchangeCodeForSession|from ['\"]inngest/next['\"]", re.I)
+SECRET_PATTERNS = [
+    (r"sk_live_[0-9A-Za-z]{10,}", "Stripe LIVE secret key", "critical"),
+    (r"rk_live_[0-9A-Za-z]{10,}", "Stripe LIVE restricted key", "critical"),
+    (r"sk_test_[0-9A-Za-z]{10,}", "Stripe test secret key", "high"),
+    (r"whsec_[0-9A-Za-z]{10,}", "Stripe webhook signing secret", "high"),
+    (r"sk-(?:proj-|ant-)?[0-9A-Za-z_\-]{20,}", "OpenAI/Anthropic API key", "critical"),
+    (r"AKIA[0-9A-Z]{16}", "AWS access key ID", "critical"),
+    (r"gh[pousr]_[0-9A-Za-z]{30,}", "GitHub token", "critical"),
+    (r"xox[abposr]-[0-9A-Za-z\-]{10,}", "Slack token", "high"),
+    (r"re_[0-9A-Za-z]{20,}", "Resend API key", "high"),
+    (r"-----BEGIN (?:RSA |EC )?PRIVATE KEY-----", "Private key", "critical"),
+]
+JWT_RX = re.compile(r"eyJ[0-9A-Za-z_\-]+\.(eyJ[0-9A-Za-z_\-]+)\.[0-9A-Za-z_\-]+")
+SENSITIVE_COLS = re.compile(r"\b(email|phone|address|role|is_admin|is_pro|plan|stripe_[a-z_]+|credits|balance|ssn|dob|birth|password|token)\b", re.I)
+
+
+def jwt_role(payload_b64):
+    try:
+        pad = "=" * (-len(payload_b64) % 4)
+        return json.loads(base64.urlsafe_b64decode(payload_b64 + pad)).get("role")
+    except Exception:
+        return None
+
+
+def gitignored_env(repo):
+    gi = repo.files.get(".gitignore", "")
+    return bool(re.search(r"^\s*\.env(\*|\..*|\s*$)", gi, re.M) or re.search(r"^\s*\*\.env", gi, re.M))
+
+
+def parse_tables(sql_text):
+    tables = {}
+    for m in re.finditer(r"create\s+table\s+(?:if\s+not\s+exists\s+)?((?:public\.)?\"?([a-zA-Z0-9_]+)\"?)\s*\((.*?)\);", sql_text, re.I | re.S):
+        tables[m.group(2).lower()] = {"cols": m.group(3), "idx": m.start()}
+    return tables
+
+
+def scan(repo):
+    F = []
+    add = lambda rid, sev, title, file=None, line=None, ev=None: F.append({"id": rid, "severity": sev, "title": title, "file": file, "line": line, "evidence": ev})
+    # SEC-002
+    env_files = [k for k in repo.files if os.path.basename(k).startswith(".env") and not k.endswith(".example") and "sample" not in k]
+    ignored = gitignored_env(repo)
+    if env_files and not ignored:
+        add("SEC-002", "critical", ".env file is not git-ignored", env_files[0], 1, ".gitignore has no .env entry")
+    # SEC-001
+    seen = set()
+    for rel, text in repo.files.items():
+        if rel.endswith(".example") or rel.endswith(".md"):
+            continue
+        in_env = os.path.basename(rel).startswith(".env")
+        for rx, label, sev in SECRET_PATTERNS:
+            for m in re.finditer(rx, text):
+                if (rel, label) in seen:
+                    continue
+                seen.add((rel, label))
+                if in_env and ignored:
+                    continue
+                add("SEC-001", sev, f"{label} committed in {'env file' if in_env else 'source code'}", rel, line_of(text, m.start()), redact(m.group(0)))
+        for m in JWT_RX.finditer(text):
+            if jwt_role(m.group(1)) == "service_role":
+                if (rel, "srk") in seen:
+                    continue
+                seen.add((rel, "srk"))
+                if in_env and ignored:
+                    continue
+                add("SEC-001", "critical", "Supabase service_role key committed", rel, line_of(text, m.start()), redact(m.group(0)))
+    # SEC-003
+    pub = re.compile(r"\b(NEXT_PUBLIC_|VITE_|EXPO_PUBLIC_|REACT_APP_|PUBLIC_)([A-Z0-9_]*(SECRET|SERVICE_ROLE|PRIVATE|SK_|STRIPE_SECRET|OPENAI|ANTHROPIC|PASSWORD|TOKEN)[A-Z0-9_]*)")
+    seen_vars = set()
+    for rel, text in repo.files.items():
+        for m in pub.finditer(text):
+            if m.group(0) in seen_vars:
+                continue
+            seen_vars.add(m.group(0))
+            add("SEC-003", "critical", f"Secret exposed to the browser: {m.group(0)}", rel, line_of(text, m.start()), m.group(0))
+    # RLS-001 / RLS-002
+    sqls = repo.sql()
+    alltext = "\n".join(sqls.values())
+    for rel, text in sqls.items():
+        for t, info in parse_tables(text).items():
+            if not re.search(rf"alter\s+table\s+(?:public\.)?\"?{t}\"?\s+enable\s+row\s+level\s+security", alltext, re.I):
+                add("RLS-001", "critical", f"Table `{t}` has Row Level Security disabled", rel, line_of(text, info["idx"]), f"create table {t} …")
+            for pm in re.finditer(rf"create\s+policy\s+\"([^\"]+)\"\s+on\s+(?:public\.)?{t}\s+(?:as\s+\w+\s+)?for\s+(select|insert|update|delete|all)\s*(?:to\s+[\w, ]+)?(.*?);", alltext, re.I | re.S):
+                name, op, body = pm.group(1), pm.group(2).lower(), pm.group(3)
+                if op in ("select", "all") and re.search(r"using\s*\(\s*true\s*\)", body, re.I):
+                    prel = next((k for k, v in sqls.items() if pm.group(0) in v), rel)
+                    pln = line_of(sqls[prel], sqls[prel].find(pm.group(0)))
+                    sens = SENSITIVE_COLS.findall(info["cols"])
+                    sev = "critical" if any(s.lower() in ("email", "phone", "address", "password", "token") for s in sens) else ("high" if sens else "medium")
+                    add("RLS-002", sev, f"`{t}`: policy \"{name}\" lets anyone read every row" + (f" (incl. {', '.join(sorted(set(s.lower() for s in sens)))})" if sens else ""), prel, pln, "using (true)")
+    # RLS-007 / RLS-010 (same regexes as the full scanner)
+    for rel, text in sqls.items():
+        for m in re.finditer(r"alter\s+table\s+(?:if\s+exists\s+)?(?:public\.)?\"?(\w+)\"?\s+disable\s+row\s+level\s+security", text, re.I):
+            add("RLS-007", "critical", f"Migration turns Row Level Security OFF on `{m.group(1)}`", rel, line_of(text, m.start()), m.group(0)[:80])
+        for m in re.finditer(r"create\s+(?:or\s+replace\s+)?view\s+(?:public\.)?\"?(\w+)\"?\s*(with\s*\([^)]*\))?\s+as", text, re.I):
+            v, opts = m.group(1), m.group(2) or ""
+            if re.search(r"security_invoker\s*=\s*(true|on)", opts, re.I) or re.search(rf"alter\s+view\s+(?:public\.)?\"?{v}\"?\s+set\s*\(\s*security_invoker\s*=\s*(true|on)", alltext, re.I):
+                continue
+            add("RLS-010", "high", f"View `{v}` runs as its owner and skips RLS", rel, line_of(text, m.start()), m.group(0)[:80])
+    # AUTH-002 / AUTH-003
+    for rel, text in api_route_files(repo).items():
+        if AUTH_RX.search(text) or "constructEvent" in text or re.search(r"webhook", rel, re.I):
+            continue
+        writes = re.search(r"\.(delete|update|insert|upsert)\(|DELETE|PUT|PATCH", text)
+        reads = re.search(r"\.select\(|findMany|SELECT", text)
+        if writes:
+            add("AUTH-002", "critical", "API route changes data without checking who is calling", rel, line_of(text, writes.start()), writes.group(0))
+        elif reads:
+            add("AUTH-003", "high", "API route returns data without authentication", rel, line_of(text, reads.start()), reads.group(0))
+    # PAY-001
+    code = {k: v for k, v in repo.code().items() if not is_test_file(k)}
+    uses_stripe = any(re.search(r"from\s+['\"]stripe['\"]|require\(['\"]stripe['\"]\)|stripe\.", v) for v in code.values()) or '"stripe"' in repo.files.get("package.json", "")
+    if uses_stripe:
+        for rel, text in code.items():
+            if (re.search(r"webhook", rel, re.I) or "checkout.session.completed" in text) and "constructEvent" not in text:
+                m = re.search(r"req(uest)?\.json\(\)|JSON\.parse", text)
+                add("PAY-001", "critical", "Stripe webhook does not verify the signature", rel, line_of(text, m.start()) if m else None, m.group(0) if m else None)
+    return F, uses_stripe
+
+
+def main():
+    if len(sys.argv) != 2 or sys.argv[1] in ("-h", "--help"):
+        sys.exit(__doc__)
+    path = sys.argv[1]
+    if not os.path.isdir(path):
+        sys.exit(f"Not a directory: {path}")
+    repo = Repo(path)
+    F, uses_stripe = scan(repo)
+    real = [f for f in F if f["severity"] in SEV_ORDER]
+    crit = sum(f["severity"] == "critical" for f in real)
+    high = sum(f["severity"] == "high" for f in real)
+    passed = 0
+    body = []
+    for n, (cid, title, rules, skill) in enumerate(CHECKS, 1):
+        hits = sorted((f for f in real if f["id"] in rules), key=lambda f: (-SEV_ORDER[f["severity"]], f["file"] or "", f["line"] or 0))
+        na = (cid == "webhook" and not uses_stripe) or (cid in ("rlsoff", "rlsread", "rlsview") and not repo.sql())
+        if hits:
+            status = "FAIL"
+        elif na:
+            status = "N/A "
+        else:
+            status = "PASS"
+            passed += 1
+        body.append(f"[{status}] {n}. {title}  ({', '.join(rules)})")
+        for f in hits:
+            loc = f"{f['file']}:{f['line']}" if f["file"] and f["line"] else (f["file"] or "repo")
+            ev = f"  `{f['evidence']}`" if f["evidence"] and f["evidence"] not in f["title"] and f["id"] != "SEC-002" else ""
+            body.append(f"   - {f['severity'].upper():8} {loc}  {f['title']}{ev}")
+        if hits:
+            skills = [skill]
+            if cid == "apiauth" and any("supabase/functions/" in (f["file"] or "").replace(os.sep, "/") for f in hits):
+                skills = ["edge-function-auth"] + ([skill] if any("supabase/functions/" not in (f["file"] or "").replace(os.sep, "/") for f in hits) else [])
+            body.append("   Fix it free: Lite skill " + " + ".join(f"`{x}`" for x in skills))
+        if na:
+            body.append("   Skipped: " + ("no Stripe usage found." if cid == "webhook" else "no SQL migrations in the repo; run the Lite skill `rls-quick-check` in the Supabase SQL editor."))
+        body.append("")
+    applicable = sum(1 for l in body if l.startswith("[PASS]") or l.startswith("[FAIL]"))
+    verdict = "DO NOT SHIP" if crit else ("FIX BEFORE LAUNCH" if high else "NO DAY-ONE BLOCKERS FOUND (8 checks only)")
+    nrules = len({r for c in CHECKS for r in c[2]})
+    out = [f"Ship-Ready Quick Scan v{VERSION} · free · {len(CHECKS)} checks ({nrules} of the {FULL_RULES} rules in the full Ship-Ready scanner)",
+           f"App: {os.path.basename(repo.root)} · {len(repo.files)} files read · offline, no network calls", "",
+           f"Result: {verdict} · {passed}/{applicable} checks passed · {crit} critical, {high} high", ""] + body
+    out += ["-" * 72,
+            f"That was the quick scan: {len(CHECKS)} day-one checks for leaked keys, open data and unpaid upgrades.",
+            f"Ship-Ready Crew: {FULL_RULES - nrules} more checks (self-promotion to admin/Pro, client-only admin checks,",
+            "public storage buckets, Stripe price tampering and entitlements, deploy, performance, launch basics),",
+            "a ship score /100, a fix plan with patches, and Proof: Playwright launch tests for your money paths.",
+            "One-time $39, 10 agents.",
+            f"  See a full sample report (49 findings on our demo app): {SAMPLE_URL}",
+            f"  Get the Crew: {CREW_URL}",
+            "",
+            "Static heuristics, not a penetration test. A PASS means the pattern was not found, not that the area is safe."]
+    print("\n".join(out))
+
+
+if __name__ == "__main__":
+    main()
