@@ -34,6 +34,18 @@ CHECKS = [
     ("webhook", "Stripe webhook signature verification", ["PAY-001"], "stripe-webhook-verify"),
 ]
 
+# check id -> one-line fix instruction for the combined AI-tool prompt
+FIX_TEXT = {
+    "secrets": "Remove the secret from the code and from any committed .env file, read it from an environment variable instead, and list the key so I can revoke and replace it in the provider's dashboard (deleting it is not enough: it stays in git history).",
+    "envignore": "Add .env* to .gitignore (keep !.env.example), stop tracking the file with `git rm --cached`, and keep a .env.example with variable names only.",
+    "publicenv": "Rename the variable without the public prefix and use it only in server code (API route, server action or edge function). List it so I can rotate it, since it has already shipped to browsers.",
+    "rlsoff": "Write a new migration that runs `alter table <name> enable row level security;` and adds owner-based policies (e.g. `using (auth.uid() = user_id)`).",
+    "rlsread": "Replace `using (true)` with a policy that only returns rows the signed-in user owns or is meant to see, and stop exposing private columns (email, role, plan) to other users.",
+    "rlsview": "Recreate the view `with (security_invoker = true)` so the caller's Row Level Security applies.",
+    "apiauth": "At the top of each handler, get the signed-in user from the server-side session, return 401 if there is none, and check they own the record before changing it.",
+    "webhook": "Verify every event with `stripe.webhooks.constructEvent(rawBody, signature, STRIPE_WEBHOOK_SECRET)` using the raw request body, and return 400 if verification fails, before acting on it.",
+}
+
 
 class Repo:
     def __init__(self, root):
@@ -250,6 +262,23 @@ def main():
     out = [f"Ship-Ready Quick Scan v{VERSION} · free · {len(CHECKS)} checks ({nrules} of the {FULL_RULES} rules in the full Ship-Ready scanner)",
            f"App: {os.path.basename(repo.root)} · {len(repo.files)} files read · offline, no network calls", "",
            f"Result: {verdict} · {passed}/{applicable} checks passed · {crit} critical, {high} high", ""] + body
+    prompt_items = []
+    for cid, title, rules, skill in CHECKS:
+        hits = sorted((f for f in real if f["id"] in rules), key=lambda f: (f["file"] or "", f["line"] or 0))
+        if not hits:
+            continue
+        locs = ", ".join(sorted({f"{f['file']}:{f['line']}" if f["file"] and f["line"] else (f["file"] or "repo") for f in hits}))
+        prompt_items.append(f"{len(prompt_items) + 1}. {title.split(' (')[0]} ({', '.join(rules)})\n   Where: {locs}\n   Fix: {FIX_TEXT[cid]}")
+    if prompt_items:
+        out += ["-" * 72,
+                "To fix them all, paste this into the AI tool that built the app (Lovable, Bolt, Cursor, Claude Code, Codex):", "",
+                f"A launch check of {os.path.basename(repo.root)} found {len(prompt_items)} problem(s). Fix each one in the code, in this order:", ""]
+        out += prompt_items
+        out += ["",
+                "Don't change what the app does. Never put a secret key in the code: read it from an environment variable.",
+                "Do database changes as new migration files, not edits to old ones.",
+                "If a step has to be done outside the code (revoking a key, a dashboard setting), list it for me at the end instead of skipping it.",
+                "When you're done, run the quick scan again and show me the result.", ""]
     out += ["-" * 72,
             f"That was the quick scan: {len(CHECKS)} day-one checks for leaked keys, open data and unpaid upgrades.",
             f"Ship-Ready Crew: {FULL_RULES - nrules} more checks (self-promotion to admin/Pro, client-only admin checks,",
