@@ -133,5 +133,7 @@ Check before you trust any skills pack, this one included. Lite is 53 skills plu
 ## Honest limits
 These skills guide your agent; they don't replace a penetration test or legal advice. Keys, dashboards, production migrations and deploys stay in your hands.
 
+Already ran a static code scanner? Good, keep it. It reads your code; the two-account test logs in as a second user and checks what that user can actually read. These skills walk your agent through that test; the Crew runs it in CI. Run both.
+
 ## License
 MIT. Use them, fork them, ship them.
