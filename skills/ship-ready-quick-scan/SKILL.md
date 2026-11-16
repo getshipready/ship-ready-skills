@@ -52,4 +52,4 @@ Then a short confirmed / false-positive list and the fix order.
 Rotating keys, changing provider dashboards, applying production migrations, deploying and charging cards are done by the human. Prepare the exact steps and wait for confirmation.
 
 ---
-Part of the free [Ship-Ready Lite](https://getshipready.github.io/lite/) library. The quick scan runs 10 of the 59 rules in the full Ship-Ready scanner. The **Ship-Ready Crew** runs all 53 with 10 agents, gives a ship score /100, a fix plan with patches and Playwright launch tests: https://getshipready.github.io/crew/ · sample report: https://getshipready.github.io/sample/
+Part of the free [Ship-Ready Lite](https://getshipready.github.io/lite/) library. The quick scan runs 10 of the 59 rules in the full Ship-Ready scanner. The **Ship-Ready Crew** runs all 59 with 10 agents, gives a ship score /100, a fix plan with patches and Playwright launch tests: https://getshipready.github.io/crew/ · sample report: https://getshipready.github.io/sample/
