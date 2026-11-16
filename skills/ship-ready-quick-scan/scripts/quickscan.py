@@ -143,7 +143,17 @@ def scan(repo):
     env_files = [k for k in repo.files if os.path.basename(k).startswith(".env") and not k.endswith(".example") and "sample" not in k]
     ignored = gitignored_env(repo)
     if env_files and not ignored:
-        add("SEC-002", "critical", ".env file is not git-ignored", env_files[0], 1, ".gitignore has no .env entry")
+        # Lovable and similar tools commit a .env holding only browser-public values
+        # (VITE_/NEXT_PUBLIC_/EXPO_PUBLIC_ URL + anon/publishable key). Those ship to every
+        # visitor anyway, so flag it low unless a non-public variable is present.
+        PUBLIC_PREFIX = re.compile(r"^\s*(export\s+)?(VITE_|NEXT_PUBLIC_|EXPO_PUBLIC_|REACT_APP_|PUBLIC_)\w*\s*=")
+        def env_vars(t):
+            return [l for l in t.splitlines() if re.match(r"^\s*(export\s+)?\w+\s*=", l)]
+        all_vars = [l for k in env_files for l in env_vars(repo.files.get(k, ""))]
+        if all_vars and all(PUBLIC_PREFIX.match(l) for l in all_vars):
+            add("SEC-002", "low", ".env is committed but holds only browser-public variables; add .env to .gitignore before you put a real secret in it", env_files[0], 1, ".gitignore has no .env entry")
+        else:
+            add("SEC-002", "critical", ".env file is not git-ignored", env_files[0], 1, ".gitignore has no .env entry")
     # SEC-001
     seen = set()
     for rel, text in repo.files.items():
