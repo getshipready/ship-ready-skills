@@ -5,6 +5,10 @@
 
 Built for apps made with **Lovable, Bolt, v0, Replit, Cursor and Claude Code** on Next.js / Vite + Supabase + Stripe + Vercel.
 
+Home: [https://getshipready.github.io](https://getshipready.github.io)
+
+The skills walk your agent through a two-account test (can a second logged-in user read the first user's rows). The automated CI version of that test is in the Crew.
+
 ## Install in one line (Claude Code)
 ```bash
 claude plugin install ship-ready-lite --marketplace getshipready/ship-ready-skills
@@ -121,10 +125,10 @@ When to use → numbered steps → copy-paste commands/code → output format �
 | Output | your agent's notes | Ship score /100, verdict, findings JSON/MD, Excel scorecard, fix plan, patches | PDF + Markdown report, fix plan + patches, one re-scan |
 | Worked example | none | PromptPad: 0/100 → 99/100, 49 findings, full patch | your app |
 
-→ Crew: https://getshipready.github.io/crew · Audit: https://getshipready.github.io/audit
+→ Home: https://getshipready.github.io · Crew: https://getshipready.github.io/crew · Audit: https://getshipready.github.io/audit
 
 ## Is it safe to install?
-Check before you trust any skills pack, this one included. Lite is 53 skills plus a router, each a folder of plain Markdown (`SKILL.md`) plus JSON plugin manifests. There is no npm package, no `postinstall` or setup script, no binaries and no network calls, so nothing runs when you install it; your agent only reads the instructions. Confirm it yourself: `find . -type f ! -name "*.md" ! -name "*.json"` lists only `LICENSE` and `.gitignore`, and no file is executable. (Some skills show commands like `curl` for you to run on purpose; your agent asks before running anything.) Why it matters: on 22 Oct 2026 GitHub published critical malware advisories for npm packages of two popular skills collections ([GHSA-rgwm-3jj9-h563](https://github.com/advisories/GHSA-rgwm-3jj9-h563), [GHSA-9855-prwc-mfp2](https://github.com/advisories/GHSA-9855-prwc-mfp2)).
+Check before you trust any skills pack, this one included. Lite is 53 skills plus a router, each a folder of plain Markdown (`SKILL.md`) plus JSON plugin manifests. There is no npm package, no `postinstall` or setup script, no binaries and no network calls, so nothing runs when you install it; your agent only reads the instructions. Confirm it yourself: `find . -type f ! -name "*.md" ! -name "*.json"` lists only `LICENSE`, `.gitignore` and `skills/ship-ready-quick-scan/scripts/quickscan.py`, a standard-library Python script that runs only when you call it (no network calls). No file is executable. (Some skills show commands like `curl` for you to run on purpose; your agent asks before running anything.) Why it matters: on 22 Oct 2026 GitHub published critical malware advisories for npm packages of two popular skills collections ([GHSA-rgwm-3jj9-h563](https://github.com/advisories/GHSA-rgwm-3jj9-h563), [GHSA-9855-prwc-mfp2](https://github.com/advisories/GHSA-9855-prwc-mfp2)).
 
 ## Honest limits
 These skills guide your agent; they don't replace a penetration test or legal advice. Keys, dashboards, production migrations and deploys stay in your hands.
