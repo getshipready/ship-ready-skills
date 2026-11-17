@@ -7,6 +7,16 @@ Built for apps made with **Lovable, Bolt, v0, Replit, Cursor and Claude Code** o
 
 Home: [https://getshipready.github.io](https://getshipready.github.io)
 
+### Guides (free, no signup)
+- [Is my Lovable app's Supabase database exposed? A 10-minute self-check](https://getshipready.github.io/guides/lovable-supabase-self-check.html)
+- ["RLS enabled" isn't a green light: test your Supabase app as a second user](https://getshipready.github.io/guides/rls-second-user-test.html)
+- [Stripe webhook not verified in a Lovable or Bolt app: how to check and fix](https://getshipready.github.io/guides/stripe-webhook-not-verified.html)
+- [Supabase anon key exposed in my frontend: is that a problem?](https://getshipready.github.io/guides/supabase-anon-key-exposed.html)
+- [Supabase insert "works" but no row appears: the silent RLS failure (and the wrong fix)](https://getshipready.github.io/guides/supabase-insert-success-no-row.html)
+- [Supabase view bypasses RLS? Fix it with security_invoker](https://getshipready.github.io/guides/supabase-view-bypasses-rls.html)
+- [Login isn't access control: the second-account test for vibe-coded apps](https://getshipready.github.io/guides/login-is-not-access-control.html)
+- [URL scan, two-account test or repo check: what each one can see in a vibe-coded app](https://getshipready.github.io/guides/url-scan-vs-two-account-test.html)
+
 The skills walk your agent through a two-account test (can a second logged-in user read the first user's rows). The automated CI version of that test is in the Crew.
 
 ## Install in one line (Claude Code)
