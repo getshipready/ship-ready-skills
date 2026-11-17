@@ -16,6 +16,7 @@ Home: [https://getshipready.github.io](https://getshipready.github.io)
 - [Supabase view bypasses RLS? Fix it with security_invoker](https://getshipready.github.io/guides/supabase-view-bypasses-rls.html)
 - [Login isn't access control: the second-account test for vibe-coded apps](https://getshipready.github.io/guides/login-is-not-access-control.html)
 - [URL scan, two-account test or repo check: what each one can see in a vibe-coded app](https://getshipready.github.io/guides/url-scan-vs-two-account-test.html)
+- [Supabase 42501 "permission denied for table" after the Oct 30 change: the safe fix](https://getshipready.github.io/guides/supabase-42501-permission-denied.html)
 
 The skills walk your agent through a two-account test (can a second logged-in user read the first user's rows). The automated CI version of that test is in the Crew.
 
