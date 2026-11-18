@@ -18,6 +18,12 @@ CASES = {
     "auth010-f7-withsupabase-secret": ("NO DAY-ONE BLOCKERS", ["[PASS] 7.", "withSupabase"], ["[FAIL]"]),
     "auth010-f8-withsupabase-none":   ("NO DAY-ONE BLOCKERS", ["[PASS] 7.", "auth: 'none'"], ["[FAIL]", "anyone can call it"]),
     "auth010-f9-plain-deno":          ("FIX BEFORE LAUNCH", ["AUTH-010", "[FAIL] 7.", "anyone can call it"], ["withSupabase"]),
+    "auth010-f10-withsupabase-named": ("NO DAY-ONE BLOCKERS", ["[PASS] 7.", "withSupabase"], ["[FAIL]"]),
+    "auth010-f11-withsupabase-publishable": ("NO DAY-ONE BLOCKERS", ["[PASS] 7.", "publishable", "rate limit"], ["[FAIL]"]),
+    "auth010-f12-withsupabase-array": ("NO DAY-ONE BLOCKERS", ["[PASS] 7.", "withSupabase"], ["[FAIL]"]),
+    "auth010-f13-withsupabase-wildcard": ("NO DAY-ONE BLOCKERS", ["[PASS] 7.", "withSupabase"], ["[FAIL]"]),
+    "auth010-f14-withsupabase-publishable-named": ("NO DAY-ONE BLOCKERS", ["[PASS] 7.", "publishable", "rate limit"], ["[FAIL]"]),
+    "auth010-f15-withsupabase-array-named": ("NO DAY-ONE BLOCKERS", ["[PASS] 7.", "withSupabase"], ["[FAIL]"]),
 }
 fails = 0
 for name, (verdict, must, mustnot) in CASES.items():

@@ -12,8 +12,8 @@ description: "Make Supabase Edge Functions verify the caller's JWT, check roles,
 - Functions deployed with `--no-verify-jwt`
 
 ## Steps
-1. Keep JWT verification on (default) unless the function is a webhook that verifies its own signature.
-2. Inside, get the user from the Authorization header; reject if missing.
+1. Decide who may call each function: a signed-in user, another service (secret key), or an outside webhook (signature).
+2. Check the caller inside the function. Either keep the platform `verify_jwt` check on (default) and still read the user, or, if the project uses the new asymmetric signing keys or `sb_` API keys, turn `verify_jwt` off and use `withSupabase` from `npm:@supabase/server` (Supabase's current recommendation). Never turn it off without a check in the code.
 3. Check role from the DB, not the request body.
 4. Secrets via `supabase secrets set`, read with `Deno.env.get`.
 5. CORS: allow only your origins; handle OPTIONS.
@@ -30,6 +30,18 @@ Deno.serve(async (req) => {
   // ... do work scoped to user.id
 });
 ```
+Supabase's current pattern (`verify_jwt = false` in `supabase/config.toml` for this function):
+```ts
+import { withSupabase } from "npm:@supabase/server@1";
+export default {
+  fetch: withSupabase({ auth: "user" }, async (_req, ctx) => {
+    // ctx.supabase is scoped to the caller's RLS; ctx.userClaims has the user id
+    return Response.json({ id: ctx.userClaims?.id });
+  }),
+};
+// service-to-service: auth: "secret" (secret key on the apikey header)
+// signed webhook: auth: "none" + verify the provider signature first
+```
 ```bash
 npx supabase secrets set OPENAI_API_KEY=... && npx supabase functions deploy my-fn
 ```
@@ -38,9 +50,11 @@ npx supabase secrets set OPENAI_API_KEY=... && npx supabase functions deploy my-
 Function inventory (auth mode, role check, secrets) + patches.
 
 ## Pitfalls
-- `--no-verify-jwt` on a non-webhook function makes it public.
+- `--no-verify-jwt` with no check in the code makes the function public. Supabase: turning it off "to clear a 401 during development removes the platform's check, leaving `withSupabase` as the only thing that verifies the caller."
+- A 401 "Invalid JWT" after moving to the new keys is the legacy check, not your code. Fix it with `verify_jwt = false` plus `withSupabase`, not by deleting your auth check.
+- Don't send `sb_publishable_` / `sb_secret_` keys as `Authorization: Bearer`; they are not JWTs. Put them on the `apikey` header.
 
-Open `supabase/config.toml`. Any `[functions.X]` with `verify_jwt = false` can be called by anyone. Keep it false only for webhooks that verify a signature first; otherwise delete the line and check the user inside the function.
+Open `supabase/config.toml`. For every `[functions.X]` with `verify_jwt = false`, confirm the function itself checks the caller (`withSupabase` auth `user`/`secret`, `auth.getUser()`, or a webhook signature check that runs before any work). If none of these is there, anyone with the URL can call it. The free quick scan reports this as AUTH-010.
 
 ## Done when
 - [ ] Unauthenticated call → 401

@@ -35,7 +35,7 @@ claude "Use ship-ready-quick-scan on this app"
 # or, without an agent (Python 3, standard library only):
 python3 skills/ship-ready-quick-scan/scripts/quickscan.py path/to/app
 ```
-Tests: `python3 skills/ship-ready-quick-scan/tests/run_tests.py` (13 fixtures).
+Tests: `python3 skills/ship-ready-quick-scan/tests/run_tests.py` (19 fixtures).
 
 What the 8 checks look for:
 1. **Leaked keys in your code**: Stripe keys, API keys or the Supabase `service_role` key committed to the repo.
