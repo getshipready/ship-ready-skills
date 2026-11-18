@@ -34,6 +34,13 @@ CASES = {
     "auth012-f4-no-thirdparty": ("NO DAY-ONE BLOCKERS", [], ["AUTH-012"]),
     "auth012-f5-auth0-then-section": ("NO DAY-ONE BLOCKERS", ["AUTH-012", "(auth0)"], ["[FAIL]"]),
     "auth012-f6-cognito": ("NO DAY-ONE BLOCKERS", [], ["AUTH-012"]),
+    "sql001-f1": ("DO NOT SHIP", ["SQL-001", "[FAIL] 9.", "exec_sql"], []),
+    "sql001-f2": ("NO DAY-ONE BLOCKERS", ["[PASS] 9."], ["SQL-001 "]),
+    "sql001-f3": ("FIX BEFORE LAUNCH", ["SQL-001", "[FAIL] 9."], []),
+    "sql001-f4": ("NO DAY-ONE BLOCKERS", ["[PASS] 9."], ["[FAIL]"]),
+    "sql001-f5": ("FIX BEFORE LAUNCH", ["SQL-001", "[FAIL] 9."], []),
+    "sql001-f6": ("NO DAY-ONE BLOCKERS", ["[PASS] 9."], ["[FAIL]"]),
+    "sql001-f7": ("DO NOT SHIP", ["SQL-001", "[FAIL] 9."], []),
 }
 fails = 0
 for name, (verdict, must, mustnot) in CASES.items():

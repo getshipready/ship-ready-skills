@@ -29,15 +29,15 @@ That's it: all 53 skills + the router. Now open your app folder and run:
 ```bash
 claude "Use ship-ready-start-here and check if this app is safe to launch"
 ```
-Want a first answer in seconds? Run the free quick scan (8 day-one checks, offline, no network calls):
+Want a first answer in seconds? Run the free quick scan (9 day-one checks, offline, no network calls):
 ```bash
 claude "Use ship-ready-quick-scan on this app"
 # or, without an agent (Python 3, standard library only):
 python3 skills/ship-ready-quick-scan/scripts/quickscan.py path/to/app
 ```
-Tests: `python3 skills/ship-ready-quick-scan/tests/run_tests.py` (19 fixtures).
+Tests: `python3 skills/ship-ready-quick-scan/tests/run_tests.py` (36 fixtures).
 
-What the 8 checks look for:
+What the 9 checks look for:
 1. **Leaked keys in your code**: Stripe keys, API keys or the Supabase `service_role` key committed to the repo.
 2. **`.env` not ignored**: `.env` isn't in `.gitignore`, so it can end up on GitHub.
 3. **Secrets in public env vars**: keys behind `NEXT_PUBLIC_`, `VITE_` or `EXPO_PUBLIC_` ship to every visitor's browser.
@@ -46,6 +46,7 @@ What the 8 checks look for:
 6. **Views that skip RLS**: views without `security_invoker` run as their owner and ignore your policies.
 7. **API routes and edge functions with no caller check**: server routes that act without confirming who is calling, and Supabase Edge Functions set to `verify_jwt = false` in `supabase/config.toml` with no user or signature check in the code, so anyone with the URL can call them (and spend your AI credit).
 8. **Stripe webhooks not verified**: handlers that don't check Stripe's signature accept fake "paid" events.
+9. **Functions that run SQL the caller sends**: a public Postgres function that `execute`s a text parameter (like `exec_sql(query text)`) lets anyone with your anon key run their own SQL, and with `security definer` it bypasses RLS. Supabase's Security Advisor lints 0031/0032 describe this; the quick scan flags it in your migrations, locally, with no code upload.
 
 Each failed check names the free skill that fixes it. [See what it prints](skills/ship-ready-quick-scan/SKILL.md).
 Also tells you if you're still on the eyJ keys Supabase retires by end of 2026.
@@ -135,7 +136,7 @@ When to use → numbered steps → copy-paste commands/code → output format �
 |---|---|---|---|
 | Price | Free, MIT | $39 one-time | $129 per app |
 | What | 53 single-task skills | 10 named agents: Harbor (lead) + Sentinel, Warden, Keymaster, Tally, Pilot, Torque, Medic, Beacon, Proof | We run the Crew on your repo; a human reviews the result |
-| Scanner | free quick scan: 8 checks (11 of the 59 rules) | 59-check offline scanner (59 rules) with file:line evidence, CI exit code | included |
+| Scanner | free quick scan: 9 checks (12 of the 59 rules) | 59-check offline scanner (59 rules) with file:line evidence, CI exit code | included |
 | Output | your agent's notes | Ship score /100, verdict, findings JSON/MD, Excel scorecard, fix plan, patches | PDF + Markdown report, fix plan + patches, one re-scan |
 | Worked example | none | PromptPad: 0/100 → 99/100, 49 findings, full patch | your app |
 

@@ -39,7 +39,7 @@ Then a short confirmed / false-positive list and the fix order.
 Also tells you if you're still on the eyJ keys Supabase retires by end of 2026.
 
 ## Pitfalls
-- A PASS means the pattern was not found, not that the area is safe. The quick scan covers 8 checks (11 rules); it does not check admin roles, privilege escalation through update policies, storage buckets, price tampering, deploy, performance or launch basics.
+- A PASS means the pattern was not found, not that the area is safe. The quick scan covers 9 checks (12 rules); it does not check admin roles, privilege escalation through update policies, storage buckets, price tampering, deploy, performance or launch basics.
 - A key in a git-ignored `.env` is fine locally; a key that was ever committed must be rotated even after deleting it.
 - Policies changed in the Supabase dashboard are not in the repo. Check live RLS with `rls-quick-check`.
 
@@ -53,4 +53,4 @@ Also tells you if you're still on the eyJ keys Supabase retires by end of 2026.
 Rotating keys, changing provider dashboards, applying production migrations, deploying and charging cards are done by the human. Prepare the exact steps and wait for confirmation.
 
 ---
-Part of the free [Ship-Ready Lite](https://getshipready.github.io/lite/) library. The quick scan runs 11 of the 59 rules in the full Ship-Ready scanner. The **Ship-Ready Crew** runs all 59 with 10 agents, gives a ship score /100, a fix plan with patches and Playwright launch tests: https://getshipready.github.io/crew/ · sample report: https://getshipready.github.io/sample/
+Part of the free [Ship-Ready Lite](https://getshipready.github.io/lite/) library. The quick scan runs 12 of the 59 rules in the full Ship-Ready scanner. The **Ship-Ready Crew** runs all 59 with 10 agents, gives a ship score /100, a fix plan with patches and Playwright launch tests: https://getshipready.github.io/crew/ · sample report: https://getshipready.github.io/sample/
