@@ -131,6 +131,11 @@ Only want one area? Install a category plugin instead:
 ## How every skill is written
 When to use → numbered steps → copy-paste commands/code → output format → pitfalls → "done when" checklist → what only a human should do. Each skill asks your agent to show evidence (file:line, command output) and never echo secrets.
 
+## Featured in
+
+- [Agentic Awesome Skills](https://github.com/sickn33/agentic-awesome-skills): `supabase-edge-function-caller-auth`
+- [awesome-supabase](https://github.com/giovannism20/awesome-supabase): Ship-Ready Lite
+
 ## Lite vs Crew vs Audit
 | | **Lite** (this repo) | **Ship-Ready Crew** | **Agent-run audit** |
 |---|---|---|---|
