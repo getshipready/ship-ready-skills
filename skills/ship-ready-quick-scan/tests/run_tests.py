@@ -28,6 +28,12 @@ CASES = {
     "rls002-to-2": ("DO NOT SHIP", ["RLS-002", "[FAIL] 5."], []),
     "rls002-to-3": ("DO NOT SHIP", ["RLS-002", "[FAIL] 5."], []),
     "rls002-to-4": ("NO DAY-ONE BLOCKERS", ["[PASS] 5."], ["[FAIL]"]),
+    "auth012-f1-clerk-uid": ("NO DAY-ONE BLOCKERS", ["AUTH-012", "(clerk)", "auth.jwt()->>'sub'"], ["[FAIL]"]),
+    "auth012-f2-clerk-sub": ("NO DAY-ONE BLOCKERS", [], ["AUTH-012"]),
+    "auth012-f3-disabled": ("NO DAY-ONE BLOCKERS", [], ["AUTH-012"]),
+    "auth012-f4-no-thirdparty": ("NO DAY-ONE BLOCKERS", [], ["AUTH-012"]),
+    "auth012-f5-auth0-then-section": ("NO DAY-ONE BLOCKERS", ["AUTH-012", "(auth0)"], ["[FAIL]"]),
+    "auth012-f6-cognito": ("NO DAY-ONE BLOCKERS", [], ["AUTH-012"]),
 }
 fails = 0
 for name, (verdict, must, mustnot) in CASES.items():

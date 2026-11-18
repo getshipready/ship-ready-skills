@@ -1,0 +1,6 @@
+[auth.third_party.auth0]
+enabled = true
+tenant = "abc"
+
+[functions.chat]
+verify_jwt = true

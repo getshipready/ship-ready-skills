@@ -1,0 +1,3 @@
+[auth.third_party.aws_cognito]
+enabled = true
+user_pool_id = "x"

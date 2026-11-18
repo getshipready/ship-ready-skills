@@ -11,7 +11,7 @@ What it is not: a penetration test or proof of safety. A clean quick scan means 
 """
 import base64, json, os, re, sys
 
-VERSION = "0.1.6"
+VERSION = "0.1.7"
 FULL_RULES = 59          # rule IDs in the full scanner (crew/shared/scripts/shipready_scan.py v1.0.0)
 SITE = "https://getshipready.github.io"
 SAMPLE_URL = SITE + "/sample"
@@ -338,6 +338,48 @@ def render_legacy_keys(notes, migrated):
     return out
 
 
+# AUTH-012 (info, not scored): third-party auth enabled in supabase/config.toml while
+# policies still use auth.uid(). Supabase: "auth.uid() casts sub to uuid, so it fails if
+# your provider issues subjects that are not UUIDs." Clerk/Auth0/WorkOS/Firebase IDs are not UUIDs.
+GUIDE_THIRD_PARTY = SITE + "/guides/supabase-third-party-auth-clerk-oidc-rls.html"
+TP_RX = re.compile(r"^\s*\[auth\.third_party\.(\w+)\]\s*$(.*?)(?=^\s*\[|\Z)", re.M | re.S)
+
+
+def third_party_auth(repo):
+    providers = []
+    for rel, text in repo.files.items():
+        if rel.split("/")[-1] != "config.toml" or "supabase" not in rel:
+            continue
+        for m in TP_RX.finditer(text):
+            # Cognito subs are UUIDs, so auth.uid() works there
+            if m.group(1).lower() != "aws_cognito" and re.search(r"^\s*enabled\s*=\s*true\b", m.group(2), re.M):
+                providers.append((m.group(1).lower(), rel, line_of(text, m.start())))
+    if not providers:
+        return [], []
+    notes = []
+    for rel, text in repo.sql().items():
+        for pm in re.finditer(r"create\s+policy\s+\"([^\"]+)\"\s+on\s+(?:public\.)?\"?(\w+)\"?(.*?);", text, re.I | re.S):
+            if re.search(r"auth\.uid\s*\(\s*\)", pm.group(3), re.I):
+                notes.append(("AUTH-012", rel, line_of(text, pm.start()), f"`{pm.group(2)}`: policy \"{pm.group(1)}\" uses auth.uid()"))
+    return providers, notes
+
+
+def render_third_party(providers, notes):
+    if not notes:
+        return []
+    names = ", ".join(sorted({p[0] for p in providers}))
+    out = [f"[INFO] Third-party auth ({names}) with auth.uid() policies  (AUTH-012, not scored)"]
+    for _, rel, ln, msg in notes[:8]:
+        out.append(f"   - INFO     {rel}:{ln}  {msg}")
+    if len(notes) > 8:
+        out.append(f"   - … {len(notes) - 8} more")
+    out.append("   auth.uid() casts the token's sub to a UUID and fails when your provider's user IDs are not UUIDs (Clerk, Auth0, WorkOS, Firebase).")
+    out.append("   Compare (select auth.jwt()->>'sub') to a text column instead. Do not \"fix\" failing policies with using (true).")
+    out.append("   With more than one issuer, add an `as restrictive` policy that checks auth.jwt()->>'iss'.")
+    out.append(f"   Guide: {GUIDE_THIRD_PARTY}")
+    return out
+
+
 def main():
     if len(sys.argv) != 2 or sys.argv[1] in ("-h", "--help"):
         sys.exit(__doc__)
@@ -387,6 +429,9 @@ def main():
     info = render_legacy_keys(*legacy_keys(repo))
     if info:
         body.extend(info + [""])
+    tp = render_third_party(*third_party_auth(repo))
+    if tp:
+        body.extend(tp + [""])
     out = [f"Ship-Ready Quick Scan v{VERSION} · free · {len(CHECKS)} checks ({nrules} of the {FULL_RULES} rules in the full Ship-Ready scanner)",
            f"App: {os.path.basename(repo.root)} · {len(repo.files)} files read · offline, no network calls", "",
            f"Result: {verdict} · {passed}/{applicable} checks passed · {crit} critical, {high} high", ""] + body
