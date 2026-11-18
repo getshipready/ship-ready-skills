@@ -11,7 +11,7 @@ What it is not: a penetration test or proof of safety. A clean quick scan means 
 """
 import base64, json, os, re, sys
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 FULL_RULES = 59          # rule IDs in the full scanner (crew/shared/scripts/shipready_scan.py v1.0.0)
 SITE = "https://getshipready.github.io"
 SAMPLE_URL = SITE + "/sample"
@@ -230,6 +230,47 @@ def scan(repo):
     return F, uses_stripe
 
 
+
+LEGACY_VAR_RX = re.compile(r"\b(?:NEXT_PUBLIC_|VITE_|EXPO_PUBLIC_|REACT_APP_|PUBLIC_)?SUPABASE_(ANON|SERVICE_ROLE)_KEY\b")
+# values, not var names: Lovable names the var PUBLISHABLE_KEY but may hold an eyJ anon key
+NEW_KEY_RX = re.compile(r"sb_publishable_[0-9A-Za-z_\-]{6,}|sb_secret_[0-9A-Za-z_\-]{6,}|SUPABASE_SECRET_KEYS")
+GUIDE_LEGACY_KEYS = SITE + "/guides/supabase-legacy-api-keys-migration.html"
+
+
+def legacy_keys(repo):
+    notes, seen = [], set()
+    for rel, text in repo.files.items():
+        if rel.endswith(".md") or is_test_file(rel):
+            continue
+        for m in JWT_RX.finditer(text):
+            role = jwt_role(m.group(1))
+            if role in ("anon", "service_role") and (rel, "jwt") not in seen:
+                seen.add((rel, "jwt"))
+                notes.append(("KEY-001", rel, line_of(text, m.start()), f"legacy `{role}` key (eyJ…) hard-coded"))
+        for m in LEGACY_VAR_RX.finditer(text):
+            if (rel, m.group(0)) in seen:
+                continue
+            seen.add((rel, m.group(0)))
+            notes.append(("KEY-001", rel, line_of(text, m.start()), f"reads legacy key variable `{m.group(0)}`"))
+    migrated = any(NEW_KEY_RX.search(t) for t in repo.files.values())
+    return notes, migrated
+
+
+def render_legacy_keys(notes, migrated):
+    if not notes:
+        return []
+    out = ["[INFO] Supabase legacy API keys still in use  (KEY-001, not scored)"]
+    for _, rel, ln, msg in notes[:8]:
+        out.append(f"   - INFO     {rel}:{ln}  {msg}")
+    if len(notes) > 8:
+        out.append(f"   - … {len(notes) - 8} more")
+    out.append("   Supabase says the legacy anon/service_role keys are deprecated by the end of 2026.")
+    if migrated:
+        out.append("   New keys also found: finish the swap, then deactivate the legacy keys (reversible).")
+    out.append(f"   Guide: {GUIDE_LEGACY_KEYS}")
+    return out
+
+
 def main():
     if len(sys.argv) != 2 or sys.argv[1] in ("-h", "--help"):
         sys.exit(__doc__)
@@ -269,6 +310,9 @@ def main():
     applicable = sum(1 for l in body if l.startswith("[PASS]") or l.startswith("[FAIL]"))
     verdict = "DO NOT SHIP" if crit else ("FIX BEFORE LAUNCH" if high else "NO DAY-ONE BLOCKERS FOUND (8 checks only)")
     nrules = len({r for c in CHECKS for r in c[2]})
+    info = render_legacy_keys(*legacy_keys(repo))
+    if info:
+        body.extend(info + [""])
     out = [f"Ship-Ready Quick Scan v{VERSION} · free · {len(CHECKS)} checks ({nrules} of the {FULL_RULES} rules in the full Ship-Ready scanner)",
            f"App: {os.path.basename(repo.root)} · {len(repo.files)} files read · offline, no network calls", "",
            f"Result: {verdict} · {passed}/{applicable} checks passed · {crit} critical, {high} high", ""] + body

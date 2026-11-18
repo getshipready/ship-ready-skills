@@ -46,6 +46,7 @@ What the 8 checks look for:
 8. **Stripe webhooks not verified**: handlers that don't check Stripe's signature accept fake "paid" events.
 
 Each failed check names the free skill that fixes it. [See what it prints](skills/ship-ready-quick-scan/SKILL.md).
+Also tells you if you're still on the eyJ keys Supabase retires by end of 2026.
 
 - Already inside a Claude Code session? Type `/plugin install ship-ready-lite --marketplace getshipready/ship-ready-skills`
 - Claude Code older than 2.1.275: `claude plugin marketplace add getshipready/ship-ready-skills`, then `claude plugin install ship-ready-lite@ship-ready`

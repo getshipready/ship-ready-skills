@@ -36,6 +36,7 @@ Result: DO NOT SHIP · 1/8 checks passed · 9 critical, 0 high
    Fix it free: Lite skill `rls-quick-check`
 ```
 Then a short confirmed / false-positive list and the fix order.
+Also tells you if you're still on the eyJ keys Supabase retires by end of 2026.
 
 ## Pitfalls
 - A PASS means the pattern was not found, not that the area is safe. The quick scan covers 8 checks (10 rules); it does not check admin roles, privilege escalation through update policies, storage buckets, price tampering, deploy, performance or launch basics.
