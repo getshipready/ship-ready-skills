@@ -133,7 +133,7 @@ When to use → numbered steps → copy-paste commands/code → output format �
 |---|---|---|---|
 | Price | Free, MIT | $39 one-time | $129 per app |
 | What | 53 single-task skills | 10 named agents: Harbor (lead) + Sentinel, Warden, Keymaster, Tally, Pilot, Torque, Medic, Beacon, Proof | We run the Crew on your repo; a human reviews the result |
-| Scanner | free quick scan: 8 checks (10 of the 59 rules) | 59-check offline scanner (59 rules) with file:line evidence, CI exit code | included |
+| Scanner | free quick scan: 8 checks (11 of the 59 rules) | 59-check offline scanner (59 rules) with file:line evidence, CI exit code | included |
 | Output | your agent's notes | Ship score /100, verdict, findings JSON/MD, Excel scorecard, fix plan, patches | PDF + Markdown report, fix plan + patches, one re-scan |
 | Worked example | none | PromptPad: 0/100 → 99/100, 49 findings, full patch | your app |
 

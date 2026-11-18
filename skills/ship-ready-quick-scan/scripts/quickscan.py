@@ -4,14 +4,14 @@
 Usage:
   python3 quickscan.py PATH            # scan the app folder at PATH, print the result
 
-Runs 8 checks (10 of the 59 rules) in the full Ship-Ready scanner (Ship-Ready Crew): the ones that
+Runs 8 checks (11 of the 59 rules) in the full Ship-Ready scanner (Ship-Ready Crew): the ones that
 expose keys, data or money on day one. Same detection logic as the full scanner for these rules.
 What it is not: a penetration test or proof of safety. A clean quick scan means "none of these
 8 checks found anything", nothing more. Secrets are redacted in all output. Nothing is sent anywhere.
 """
 import base64, json, os, re, sys
 
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 FULL_RULES = 59          # rule IDs in the full scanner (crew/shared/scripts/shipready_scan.py v1.0.0)
 SITE = "https://getshipready.github.io"
 SAMPLE_URL = SITE + "/sample"
@@ -30,7 +30,7 @@ CHECKS = [
     ("rlsoff", "Supabase tables with Row Level Security off (never enabled, or disabled later)", ["RLS-001", "RLS-007"], "rls-quick-check"),
     ("rlsread", "Supabase read policies open to everyone (`using (true)`)", ["RLS-002"], "rls-policy-writer"),
     ("rlsview", "Views that skip Row Level Security (no `security_invoker`)", ["RLS-010"], "rls-policy-writer"),
-    ("apiauth", "API routes that skip the caller check", ["AUTH-002", "AUTH-003"], "protect-routes-nextjs"),
+    ("apiauth", "API routes that skip the caller check", ["AUTH-002", "AUTH-003", "AUTH-010"], "protect-routes-nextjs"),
     ("webhook", "Stripe webhook signature verification", ["PAY-001"], "stripe-webhook-verify"),
 ]
 
@@ -42,7 +42,7 @@ FIX_TEXT = {
     "rlsoff": "Write a new migration that runs `alter table <name> enable row level security;` and adds owner-based policies (e.g. `using (auth.uid() = user_id)`).",
     "rlsread": "Replace `using (true)` with a policy that only returns rows the signed-in user owns or is meant to see, and stop exposing private columns (email, role, plan) to other users.",
     "rlsview": "Recreate the view `with (security_invoker = true)` so the caller's Row Level Security applies.",
-    "apiauth": "At the top of each handler, get the signed-in user from the server-side session, return 401 if there is none, and check they own the record before changing it.",
+    "apiauth": "At the top of each handler, get the signed-in user from the server-side session, return 401 if there is none, and check they own the record before changing it. For a Supabase edge function with verify_jwt = false, set verify_jwt = true (or delete the line) unless it is a webhook that verifies the provider's signature first.",
     "webhook": "Verify every event with `stripe.webhooks.constructEvent(rawBody, signature, STRIPE_WEBHOOK_SECRET)` using the raw request body, and return 400 if verification fails, before acting on it.",
 }
 
@@ -100,6 +100,50 @@ def api_route_files(repo):
 
 
 AUTH_RX = re.compile(r"auth\.getUser\(|getUser\(|getServerSession|auth\(\)|currentUser\(|getAuth\(|verifyIdToken|jwt\.verify|requireUser|withAuth|clerkClient|getToken\(|validateRequest|lucia|get\w*(?:User|Session)\(|verify\w*Token\(|exchangeOAuthCode|exchangeCodeForSession|from ['\"]inngest/next['\"]", re.I)
+
+FN_SECTION_RX = re.compile(r"^\s*\[functions\.([A-Za-z0-9_\-]+)\]\s*$", re.M)
+VERIFY_JWT_OFF_RX = re.compile(r"^\s*verify_jwt\s*=\s*false\b", re.M)
+SIG_RX = re.compile(r"constructEvent(?:Async)?\(|new\s+Webhook\(|svix|stripe-signature|x-signature|createHmac\(|timingSafeEqual|crypto\.subtle\.verify|WEBHOOK_SECRET|CRON_SECRET", re.I)
+PUBLIC_HINT = re.compile(r"auth:\s*['\"]none['\"]")
+
+
+def functions_off(repo):
+    out = []
+    for rel, text in repo.files.items():
+        path = rel.replace(os.sep, "/")
+        if path.split("/")[-1] != "config.toml" or "supabase" not in path:
+            continue
+        secs = list(FN_SECTION_RX.finditer(text))
+        for i, m in enumerate(secs):
+            end = secs[i + 1].start() if i + 1 < len(secs) else len(text)
+            off = VERIFY_JWT_OFF_RX.search(text, m.end(), end)
+            if off:
+                out.append((m.group(1), rel, line_of(text, off.start())))
+    return out
+
+
+def fn_code(repo, name):
+    pre = f"supabase/functions/{name}/"
+    return "\n".join(v for k, v in repo.code().items() if pre in k.replace(os.sep, "/"))
+
+
+def verify_jwt_findings(repo):
+    F = []
+    for name, rel, line in functions_off(repo):
+        code = fn_code(repo, name)
+        if not code:
+            F.append(("AUTH-010", "info", rel, line, f"`{name}`: verify_jwt = false, function code not found in repo; check it by hand"))
+        elif SIG_RX.search(code):
+            F.append(("AUTH-010", "info", rel, line, f"`{name}`: verify_jwt = false, but it checks a signature/secret (webhook pattern); OK if that check runs before any work"))
+        elif AUTH_RX.search(code):
+            F.append(("AUTH-010", "info", rel, line, f"`{name}`: verify_jwt = false, user is checked in code; make sure it rejects the anon key with 401"))
+        elif PUBLIC_HINT.search(code):
+            F.append(("AUTH-010", "info", rel, line, f"`{name}`: marked public (auth: 'none'); add a rate limit and input size cap"))
+        else:
+            F.append(("AUTH-010", "high", rel, line, f"`{name}`: verify_jwt = false and no user or signature check, anyone can call it"))
+    return F
+
+
 SECRET_PATTERNS = [
     (r"sk_live_[0-9A-Za-z]{10,}", "Stripe LIVE secret key", "critical"),
     (r"rk_live_[0-9A-Za-z]{10,}", "Stripe LIVE restricted key", "critical"),
@@ -219,6 +263,9 @@ def scan(repo):
             add("AUTH-002", "critical", "API route changes data without checking who is calling", rel, line_of(text, writes.start()), writes.group(0))
         elif reads:
             add("AUTH-003", "high", "API route returns data without authentication", rel, line_of(text, reads.start()), reads.group(0))
+    # AUTH-010: supabase/config.toml verify_jwt = false
+    for rid, sev, rel, line, msg in verify_jwt_findings(repo):
+        add(rid, sev, msg, rel, line, "verify_jwt = false")
     # PAY-001
     code = {k: v for k, v in repo.code().items() if not is_test_file(k)}
     uses_stripe = any(re.search(r"from\s+['\"]stripe['\"]|require\(['\"]stripe['\"]\)|stripe\.", v) for v in code.values()) or '"stripe"' in repo.files.get("package.json", "")
@@ -284,8 +331,13 @@ def main():
     high = sum(f["severity"] == "high" for f in real)
     passed = 0
     body = []
+    def is_edge_finding(f):
+        path = (f["file"] or "").replace(os.sep, "/")
+        return f["id"] == "AUTH-010" or "supabase/functions/" in path or path.endswith("supabase/config.toml") or "/supabase/config.toml" in path
+
     for n, (cid, title, rules, skill) in enumerate(CHECKS, 1):
         hits = sorted((f for f in real if f["id"] in rules), key=lambda f: (-SEV_ORDER[f["severity"]], f["file"] or "", f["line"] or 0))
+        infos = sorted((f for f in F if f["id"] in rules and f["severity"] == "info"), key=lambda f: (f["file"] or "", f["line"] or 0))
         na = (cid == "webhook" and not uses_stripe) or (cid in ("rlsoff", "rlsread", "rlsview") and not repo.sql())
         if hits:
             status = "FAIL"
@@ -295,14 +347,14 @@ def main():
             status = "PASS"
             passed += 1
         body.append(f"[{status}] {n}. {title}  ({', '.join(rules)})")
-        for f in hits:
+        for f in hits + infos:
             loc = f"{f['file']}:{f['line']}" if f["file"] and f["line"] else (f["file"] or "repo")
             ev = f"  `{f['evidence']}`" if f["evidence"] and f["evidence"] not in f["title"] and f["id"] != "SEC-002" else ""
             body.append(f"   - {f['severity'].upper():8} {loc}  {f['title']}{ev}")
         if hits:
             skills = [skill]
-            if cid == "apiauth" and any("supabase/functions/" in (f["file"] or "").replace(os.sep, "/") for f in hits):
-                skills = ["edge-function-auth"] + ([skill] if any("supabase/functions/" not in (f["file"] or "").replace(os.sep, "/") for f in hits) else [])
+            if cid == "apiauth" and any(is_edge_finding(f) for f in hits):
+                skills = ["edge-function-auth"] + ([skill] if any(not is_edge_finding(f) for f in hits) else [])
             body.append("   Fix it free: Lite skill " + " + ".join(f"`{x}`" for x in skills))
         if na:
             body.append("   Skipped: " + ("no Stripe usage found." if cid == "webhook" else "no SQL migrations in the repo; run the Lite skill `rls-quick-check` in the Supabase SQL editor."))

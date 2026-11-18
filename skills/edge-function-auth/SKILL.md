@@ -40,6 +40,8 @@ Function inventory (auth mode, role check, secrets) + patches.
 ## Pitfalls
 - `--no-verify-jwt` on a non-webhook function makes it public.
 
+Open `supabase/config.toml`. Any `[functions.X]` with `verify_jwt = false` can be called by anyone. Keep it false only for webhooks that verify a signature first; otherwise delete the line and check the user inside the function.
+
 ## Done when
 - [ ] Unauthenticated call → 401
 - [ ] Wrong role → 403
