@@ -11,7 +11,7 @@ What it is not: a penetration test or proof of safety. A clean quick scan means 
 """
 import base64, json, os, re, sys
 
-VERSION = "0.1.5"
+VERSION = "0.1.6"
 FULL_RULES = 59          # rule IDs in the full scanner (crew/shared/scripts/shipready_scan.py v1.0.0)
 SITE = "https://getshipready.github.io"
 SAMPLE_URL = SITE + "/sample"
@@ -256,7 +256,7 @@ def scan(repo):
         for t, info in parse_tables(text).items():
             if not re.search(rf"alter\s+table\s+(?:public\.)?\"?{t}\"?\s+enable\s+row\s+level\s+security", alltext, re.I):
                 add("RLS-001", "critical", f"Table `{t}` has Row Level Security disabled", rel, line_of(text, info["idx"]), f"create table {t} …")
-            for pm in re.finditer(rf"create\s+policy\s+\"([^\"]+)\"\s+on\s+(?:public\.)?{t}\s+(?:as\s+\w+\s+)?for\s+(select|insert|update|delete|all)\s*(?:to\s+[\w, ]+)?(.*?);", alltext, re.I | re.S):
+            for pm in re.finditer(rf"create\s+policy\s+\"([^\"]+)\"\s+on\s+(?:public\.)?{t}\s+(?:as\s+\w+\s+)?for\s+(select|insert|update|delete|all)\s*(?:to\s+[\w ,]+?(?=\s+(?:using|with)\b|\s*;))?(.*?);", alltext, re.I | re.S):
                 name, op, body = pm.group(1), pm.group(2).lower(), pm.group(3)
                 if op in ("select", "all") and re.search(r"using\s*\(\s*true\s*\)", body, re.I):
                     prel = next((k for k, v in sqls.items() if pm.group(0) in v), rel)

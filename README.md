@@ -42,7 +42,7 @@ What the 8 checks look for:
 2. **`.env` not ignored**: `.env` isn't in `.gitignore`, so it can end up on GitHub.
 3. **Secrets in public env vars**: keys behind `NEXT_PUBLIC_`, `VITE_` or `EXPO_PUBLIC_` ship to every visitor's browser.
 4. **Row Level Security off**: Supabase tables where RLS was never turned on, or a later migration turned it off.
-5. **Read policies open to everyone**: `using (true)` policies let any visitor read every row.
+5. **Read policies open to everyone**: `using (true)` policies let any visitor read every row. Supabase's Security Advisor skips read policies with `using (true)` on purpose ([splinter lint 0024](https://github.com/supabase/splinter/blob/main/lints/0024_rls_policy_always_true.sql)); the free quick scan flags them.
 6. **Views that skip RLS**: views without `security_invoker` run as their owner and ignore your policies.
 7. **API routes and edge functions with no caller check**: server routes that act without confirming who is calling, and Supabase Edge Functions set to `verify_jwt = false` in `supabase/config.toml` with no user or signature check in the code, so anyone with the URL can call them (and spend your AI credit).
 8. **Stripe webhooks not verified**: handlers that don't check Stripe's signature accept fake "paid" events.

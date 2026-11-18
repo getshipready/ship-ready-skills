@@ -24,6 +24,10 @@ CASES = {
     "auth010-f13-withsupabase-wildcard": ("NO DAY-ONE BLOCKERS", ["[PASS] 7.", "withSupabase"], ["[FAIL]"]),
     "auth010-f14-withsupabase-publishable-named": ("NO DAY-ONE BLOCKERS", ["[PASS] 7.", "publishable", "rate limit"], ["[FAIL]"]),
     "auth010-f15-withsupabase-array-named": ("NO DAY-ONE BLOCKERS", ["[PASS] 7.", "withSupabase"], ["[FAIL]"]),
+    "rls002-to-1": ("DO NOT SHIP", ["RLS-002", "[FAIL] 5."], []),
+    "rls002-to-2": ("DO NOT SHIP", ["RLS-002", "[FAIL] 5."], []),
+    "rls002-to-3": ("DO NOT SHIP", ["RLS-002", "[FAIL] 5."], []),
+    "rls002-to-4": ("NO DAY-ONE BLOCKERS", ["[PASS] 5."], ["[FAIL]"]),
 }
 fails = 0
 for name, (verdict, must, mustnot) in CASES.items():
