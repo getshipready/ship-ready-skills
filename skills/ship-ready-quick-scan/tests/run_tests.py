@@ -41,6 +41,8 @@ CASES = {
     "sql001-f5": ("FIX BEFORE LAUNCH", ["SQL-001", "[FAIL] 9."], []),
     "sql001-f6": ("NO DAY-ONE BLOCKERS", ["[PASS] 9."], ["[FAIL]"]),
     "sql001-f7": ("DO NOT SHIP", ["SQL-001", "[FAIL] 9."], []),
+    "sql001-f8": ("DO NOT SHIP", ["SQL-001", "[FAIL] 9."], []),
+    "sql001-f9": ("NO DAY-ONE BLOCKERS", ["[PASS] 9."], ["SQL-001 "]),
 }
 fails = 0
 for name, (verdict, must, mustnot) in CASES.items():

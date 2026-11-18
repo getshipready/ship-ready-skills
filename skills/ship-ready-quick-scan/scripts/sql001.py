@@ -45,15 +45,16 @@ def find(sql_files):
             if not (direct or any(p in SQLISH for p in params)):
                 continue
             rv = lambda role: re.search(rf"revoke\s+(all|execute)[^;]*on\s+function\s+(public\.)?\"?{re.escape(name.lower())}\"?[^;]*from[^;]*\b{role}\b", all_sql)
-            anon_off, auth_off = bool(rv("anon")), bool(rv("authenticated"))
-            if anon_off and auth_off:
+            anon_off, auth_off, pub_off = bool(rv("anon")), bool(rv("authenticated")), bool(rv("public"))
+            # Postgres grants EXECUTE to PUBLIC by default; revoking only anon/authenticated leaves it callable (Supabase KB + database functions guide).
+            if anon_off and auth_off and pub_off:
                 continue
-            who = "any signed-up user" if anon_off else "anyone with your anon key"
+            who = "anyone with your anon key" if not (anon_off and pub_off) else "any signed-up user"
             definer = "security definer" in attrs
             sev = "critical" if (definer and direct) else "high"
             line = text.count("\n", 0, m.start()) + 1
             out.append({"id": "SQL-001", "severity": sev, "file": rel, "line": line,
                         "title": f"`{name}()` runs SQL passed in by the caller and {who} can call it at /rest/v1/rpc/{name}" + (" (security definer: runs as the owner, bypassing RLS)" if definer else ""),
-                        "evidence": "execute with a text parameter; not revoked from " + ("authenticated" if anon_off else "anon"),
+                        "evidence": "execute with a text parameter; not revoked from " + ", ".join(r for r, off in (("anon", anon_off), ("authenticated", auth_off), ("public", pub_off)) if not off),
                         "fix": f"revoke execute on function public.{name} from anon, authenticated, public;  -- or drop it; Supabase lint 0031/0032"})
     return out
