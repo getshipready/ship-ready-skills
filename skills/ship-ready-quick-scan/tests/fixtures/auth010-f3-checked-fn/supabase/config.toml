@@ -1,0 +1,5 @@
+[functions.report]
+verify_jwt = false
+
+[functions.other]
+verify_jwt = true

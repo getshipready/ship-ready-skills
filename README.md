@@ -35,6 +35,8 @@ claude "Use ship-ready-quick-scan on this app"
 # or, without an agent (Python 3, standard library only):
 python3 skills/ship-ready-quick-scan/scripts/quickscan.py path/to/app
 ```
+Tests: `python3 skills/ship-ready-quick-scan/tests/run_tests.py` (13 fixtures).
+
 What the 8 checks look for:
 1. **Leaked keys in your code**: Stripe keys, API keys or the Supabase `service_role` key committed to the repo.
 2. **`.env` not ignored**: `.env` isn't in `.gitignore`, so it can end up on GitHub.
@@ -42,7 +44,7 @@ What the 8 checks look for:
 4. **Row Level Security off**: Supabase tables where RLS was never turned on, or a later migration turned it off.
 5. **Read policies open to everyone**: `using (true)` policies let any visitor read every row.
 6. **Views that skip RLS**: views without `security_invoker` run as their owner and ignore your policies.
-7. **API routes with no caller check**: server routes that act without confirming who is calling.
+7. **API routes and edge functions with no caller check**: server routes that act without confirming who is calling, and Supabase Edge Functions set to `verify_jwt = false` in `supabase/config.toml` with no user or signature check in the code, so anyone with the URL can call them (and spend your AI credit).
 8. **Stripe webhooks not verified**: handlers that don't check Stripe's signature accept fake "paid" events.
 
 Each failed check names the free skill that fixes it. [See what it prints](skills/ship-ready-quick-scan/SKILL.md).

@@ -11,7 +11,7 @@ What it is not: a penetration test or proof of safety. A clean quick scan means 
 """
 import base64, json, os, re, sys
 
-VERSION = "0.1.3"
+VERSION = "0.1.4"
 FULL_RULES = 59          # rule IDs in the full scanner (crew/shared/scripts/shipready_scan.py v1.0.0)
 SITE = "https://getshipready.github.io"
 SAMPLE_URL = SITE + "/sample"
@@ -108,6 +108,8 @@ FN_SECTION_RX = re.compile(r"^\s*\[functions\.([A-Za-z0-9_\-]+)\]\s*$", re.M)
 VERIFY_JWT_OFF_RX = re.compile(r"^\s*verify_jwt\s*=\s*false\b", re.M)
 SIG_RX = re.compile(r"constructEvent(?:Async)?\(|new\s+Webhook\(|svix|stripe-signature|x-signature|createHmac\(|timingSafeEqual|crypto\.subtle\.verify|WEBHOOK_SECRET|CRON_SECRET", re.I)
 PUBLIC_HINT = re.compile(r"auth:\s*['\"]none['\"]")
+# @supabase/server wrapper (Supabase's recommended pattern since asymmetric keys): auth 'user'/'secret' checks the caller
+SBSERVER_RX = re.compile(r"withSupabase\(\s*\{[^}]*auth:\s*\[?\s*['\"](?:user|secret)['\"]", re.S)
 
 
 def functions_off(repo):
@@ -148,6 +150,8 @@ def verify_jwt_findings(repo):
             F.append(("AUTH-010", "info", rel, line, f"`{name}`: verify_jwt = false, function code not found in repo; check it by hand"))
         elif SIG_RX.search(code):
             F.append(("AUTH-010", "info", rel, line, f"`{name}`: verify_jwt = false, but it checks a signature/secret (webhook pattern); OK if that check runs before any work"))
+        elif SBSERVER_RX.search(code):
+            F.append(("AUTH-010", "info", rel, line, f"`{name}`: verify_jwt = false, caller checked by withSupabase (@supabase/server); OK"))
         elif AUTH_RX.search(code):
             F.append(("AUTH-010", "info", rel, line, f"`{name}`: verify_jwt = false, user is checked in code; make sure it rejects the anon key with 401"))
         elif PUBLIC_HINT.search(code):
