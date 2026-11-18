@@ -11,7 +11,7 @@ What it is not: a penetration test or proof of safety. A clean quick scan means 
 """
 import base64, json, os, re, sys
 
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 FULL_RULES = 59          # rule IDs in the full scanner (crew/shared/scripts/shipready_scan.py v1.0.0)
 SITE = "https://getshipready.github.io"
 SAMPLE_URL = SITE + "/sample"
@@ -45,6 +45,9 @@ FIX_TEXT = {
     "apiauth": "At the top of each handler, get the signed-in user from the server-side session, return 401 if there is none, and check they own the record before changing it. For a Supabase edge function with verify_jwt = false, set verify_jwt = true (or delete the line) unless it is a webhook that verifies the provider's signature first.",
     "webhook": "Verify every event with `stripe.webhooks.constructEvent(rawBody, signature, STRIPE_WEBHOOK_SECRET)` using the raw request body, and return 400 if verification fails, before acting on it.",
 }
+# Extra AUTH-010 HIGH fix line when the flagged function reads LOVABLE_API_KEY
+# (Lovable usage limits: project-scoped Pause AI). Counts and verdict stay unchanged.
+PAUSE_AI_FIX = "Also set a project 'Pause AI' usage limit in Lovable's usage settings."
 
 
 class Repo:
@@ -125,6 +128,16 @@ def functions_off(repo):
 def fn_code(repo, name):
     pre = f"supabase/functions/{name}/"
     return "\n".join(v for k, v in repo.code().items() if pre in k.replace(os.sep, "/"))
+
+
+def auth010_high_uses_lovable_key(repo, finding):
+    """True when a HIGH AUTH-010 finding's function source references LOVABLE_API_KEY."""
+    if finding.get("id") != "AUTH-010" or finding.get("severity") != "high":
+        return False
+    m = re.match(r"`([^`]+)`:", finding.get("title") or "")
+    if not m:
+        return False
+    return "LOVABLE_API_KEY" in fn_code(repo, m.group(1))
 
 
 def verify_jwt_findings(repo):
@@ -351,6 +364,8 @@ def main():
             loc = f"{f['file']}:{f['line']}" if f["file"] and f["line"] else (f["file"] or "repo")
             ev = f"  `{f['evidence']}`" if f["evidence"] and f["evidence"] not in f["title"] and f["id"] != "SEC-002" else ""
             body.append(f"   - {f['severity'].upper():8} {loc}  {f['title']}{ev}")
+            if auth010_high_uses_lovable_key(repo, f):
+                body.append(f"     {PAUSE_AI_FIX}")
         if hits:
             skills = [skill]
             if cid == "apiauth" and any(is_edge_finding(f) for f in hits):
@@ -374,7 +389,10 @@ def main():
         if not hits:
             continue
         locs = ", ".join(sorted({f"{f['file']}:{f['line']}" if f["file"] and f["line"] else (f["file"] or "repo") for f in hits}))
-        prompt_items.append(f"{len(prompt_items) + 1}. {title.split(' (')[0]} ({', '.join(rules)})\n   Where: {locs}\n   Fix: {FIX_TEXT[cid]}")
+        fix = FIX_TEXT[cid]
+        if cid == "apiauth" and any(auth010_high_uses_lovable_key(repo, f) for f in hits):
+            fix = fix + " " + PAUSE_AI_FIX
+        prompt_items.append(f"{len(prompt_items) + 1}. {title.split(' (')[0]} ({', '.join(rules)})\n   Where: {locs}\n   Fix: {fix}")
     if prompt_items:
         out += ["-" * 72,
                 "To fix them all, paste this into the AI tool that built the app (Lovable, Bolt, Cursor, Claude Code, Codex):", "",
