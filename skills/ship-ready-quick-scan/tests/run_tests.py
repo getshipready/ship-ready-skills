@@ -62,6 +62,14 @@ CASES = {
     "rls014-f7": ("NO DAY-ONE BLOCKERS", ["[PASS] 11."], ["[FAIL]"]),
     "rls014-f8": ("FIX BEFORE LAUNCH", ["RLS-014", "[FAIL] 11."], []),
     "rls014-f9": ("NO DAY-ONE BLOCKERS", ["[PASS] 11."], ["[FAIL]"]),
+    "usermeta-f1": ("DO NOT SHIP", ["AUTH-013", "[FAIL] 12.", "admins read all"], []),
+    "usermeta-f2": ("FIX BEFORE LAUNCH", ["AUTH-013", "[FAIL] 12.", "HIGH"], []),
+    "usermeta-f3": ("NO DAY-ONE BLOCKERS", ["[PASS] 12."], ["AUTH-013 ", "[FAIL]"]),
+    "usermeta-f4": ("NO DAY-ONE BLOCKERS", ["[PASS] 12."], ["[FAIL]"]),
+    "usermeta-f5": ("DO NOT SHIP", ["AUTH-013", "[FAIL] 12."], []),
+    "usermeta-f6": ("FIX BEFORE LAUNCH", ["AUTH-013", "[FAIL] 12."], []),
+    "usermeta-f7": ("DO NOT SHIP", ["AUTH-013", "[FAIL] 12."], []),
+    "usermeta-f8": ("NO DAY-ONE BLOCKERS", ["[PASS] 12."], ["[FAIL]"]),
 }
 fails = 0
 for name, (verdict, must, mustnot) in CASES.items():

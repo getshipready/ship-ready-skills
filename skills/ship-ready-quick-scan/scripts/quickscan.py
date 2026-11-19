@@ -8,16 +8,16 @@ Usage:
 
 Without --fail-on the exit code is always 0 after a scan.
 
-Runs 11 checks (14 of the 59 rules) in the full Ship-Ready scanner (Ship-Ready Crew): the ones that
+Runs 12 checks (14 of the 59 rules in the full Ship-Ready scanner, Ship-Ready Crew, plus AUTH-013): the ones that
 expose keys, data or money on day one. Same detection logic as the full scanner for these rules.
 What it is not: a penetration test or proof of safety. A clean quick scan means "none of these
-11 checks found anything", nothing more. Secrets are redacted in all output. Nothing is sent anywhere.
+12 checks found anything", nothing more. Secrets are redacted in all output. Nothing is sent anywhere.
 """
 import base64, json, os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import sql001, rls011, rls014
+import sql001, rls011, rls014, auth013
 
-VERSION = "0.2.2"
+VERSION = "0.2.3"
 FULL_RULES = 59          # rule IDs in the full scanner (crew/shared/scripts/shipready_scan.py v1.0.0)
 SITE = "https://getshipready.github.io"
 SAMPLE_URL = SITE + "/sample"
@@ -41,6 +41,7 @@ CHECKS = [
     ("rpcsql", "Functions anyone can call to run their own SQL", ["SQL-001"], "rls-policy-writer"),
     ("defnfn", "Database functions a signed-out visitor can call (`security definer`)", ["RLS-011"], "rls-policy-writer"),
     ("defgrant", "Default grants that make every new table reachable through the API", ["RLS-014"], "rls-policy-writer"),
+    ("usermeta", "Roles or plans read from user_metadata, which signed-in users can edit themselves", ["AUTH-013"], "admin-role-setup"),
 ]
 
 # check id -> one-line fix instruction for the combined AI-tool prompt
@@ -52,6 +53,7 @@ FIX_TEXT = {
     "rlsread": "Replace `using (true)` with a policy that only returns rows the signed-in user owns or is meant to see, and stop exposing private columns (email, role, plan) to other users.",
     "rlsview": "Recreate the view `with (security_invoker = true)` so the caller's Row Level Security applies.",
     "defnfn": "For each function listed, run `revoke execute on function public.<name> from public, anon;` (Postgres lets everyone call new functions by default, so revoking from anon alone is not enough), then grant it back only to `authenticated` if signed-in users need it, or make it `security invoker`. Supabase lint 0028 describes this.",
+    "usermeta": "Stop authorizing from `user_metadata` / `raw_user_meta_data` (users can change it with `supabase.auth.updateUser`). Read roles from `app_metadata` (`auth.jwt() -> 'app_metadata'`, writable only by the server) or from a roles table users cannot write, and make any sign-up trigger set a safe default role instead of copying one from the metadata.",
     "defgrant": "Remove the `alter default privileges ... grant ... on tables to anon/authenticated` statement (and any `grant ... on all tables in schema public to anon`). Instead grant per table, in the migration that creates it (`grant select, insert on public.<table> to authenticated;`), together with `enable row level security` and a policy.",
     "rpcsql": "Drop the function, or revoke execute on it from anon, authenticated and public. If you must keep it, pass values as parameters (`execute ... using`) and wrap identifiers in quote_ident() instead of concatenating text the caller sends. Supabase lints 0031/0032 describe this.",
     "apiauth": "At the top of each handler, get the signed-in user from the server-side session, return 401 if there is none, and check they own the record before changing it. For a Supabase edge function with verify_jwt = false, set verify_jwt = true (or delete the line) unless it is a webhook that verifies the provider's signature first.",
@@ -294,6 +296,9 @@ def scan(repo):
     # RLS-014: default / bulk table grants to API roles
     for f in rls014.find(sqls):
         add("RLS-014", f["severity"], f["title"], f["file"], f["line"], f["evidence"])
+    # AUTH-013: policies (matches Supabase Advisor lint 0015) and sign-up triggers / helper functions that take a role from user_metadata
+    for f in auth013.find(sqls):
+        add("AUTH-013", f["severity"], f["title"], f["file"], f["line"], f["evidence"])
     # AUTH-002 / AUTH-003
     for rel, text in api_route_files(repo).items():
         if AUTH_RX.search(text) or "constructEvent" in text or re.search(r"webhook", rel, re.I):
@@ -427,7 +432,7 @@ def main():
     for n, (cid, title, rules, skill) in enumerate(CHECKS, 1):
         hits = sorted((f for f in real if f["id"] in rules), key=lambda f: (-SEV_ORDER[f["severity"]], f["file"] or "", f["line"] or 0))
         infos = sorted((f for f in F if f["id"] in rules and f["severity"] == "info"), key=lambda f: (f["file"] or "", f["line"] or 0))
-        na = (cid == "webhook" and not uses_stripe) or (cid in ("rlsoff", "rlsread", "rlsview", "rpcsql", "defnfn", "defgrant") and not repo.sql())
+        na = (cid == "webhook" and not uses_stripe) or (cid in ("rlsoff", "rlsread", "rlsview", "rpcsql", "defnfn", "defgrant", "usermeta") and not repo.sql())
         if hits:
             status = "FAIL"
         elif na:
@@ -452,14 +457,14 @@ def main():
         body.append("")
     applicable = sum(1 for l in body if l.startswith("[PASS]") or l.startswith("[FAIL]"))
     verdict = "NOTHING TO SCAN: no Supabase or app files were found in this folder (0 files read, no checks run)" if not repo.files else "DO NOT SHIP" if crit else ("FIX BEFORE LAUNCH" if high else f"NO DAY-ONE BLOCKERS FOUND ({len(CHECKS)} checks only)")
-    nrules = len({r for c in CHECKS for r in c[2]})
+    nrules = len({r for c in CHECKS for r in c[2] if r != "AUTH-013"})  # AUTH-013 is not in the Crew scanner yet
     info = render_legacy_keys(*legacy_keys(repo))
     if info:
         body.extend(info + [""])
     tp = render_third_party(*third_party_auth(repo))
     if tp:
         body.extend(tp + [""])
-    out = [f"Ship-Ready Quick Scan v{VERSION} · free · {len(CHECKS)} checks ({nrules} of the {FULL_RULES} rules in the full Ship-Ready scanner)",
+    out = [f"Ship-Ready Quick Scan v{VERSION} · free · {len(CHECKS)} checks ({nrules} of the {FULL_RULES} rules in the full Ship-Ready scanner, plus AUTH-013)",
            f"App: {os.path.basename(repo.root)} · {len(repo.files)} files read · offline, no network calls", "",
            f"Result: {verdict} · {passed}/{applicable} checks passed · {crit} critical, {high} high", ""] + body
     prompt_items = []
