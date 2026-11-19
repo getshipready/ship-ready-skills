@@ -29,15 +29,15 @@ That's it: all 53 skills + the router. Now open your app folder and run:
 ```bash
 claude "Use ship-ready-start-here and check if this app is safe to launch"
 ```
-Want a first answer in seconds? Run the free quick scan (10 day-one checks, offline, no network calls):
+Want a first answer in seconds? Run the free quick scan (11 day-one checks, offline, no network calls):
 ```bash
 claude "Use ship-ready-quick-scan on this app"
 # or, without an agent (Python 3, standard library only):
 python3 skills/ship-ready-quick-scan/scripts/quickscan.py path/to/app
 ```
-Tests: `python3 skills/ship-ready-quick-scan/tests/run_tests.py` (47 fixtures).
+Tests: `python3 skills/ship-ready-quick-scan/tests/run_tests.py` (57 fixtures).
 
-What the 10 checks look for:
+What the 11 checks look for:
 1. **Leaked keys in your code**: Stripe keys, API keys or the Supabase `service_role` key committed to the repo.
 2. **`.env` not ignored**: `.env` isn't in `.gitignore`, so it can end up on GitHub.
 3. **Secrets in public env vars**: keys behind `NEXT_PUBLIC_`, `VITE_` or `EXPO_PUBLIC_` ship to every visitor's browser.
@@ -47,7 +47,12 @@ What the 10 checks look for:
 7. **API routes and edge functions with no caller check**: server routes that act without confirming who is calling, and Supabase Edge Functions set to `verify_jwt = false` in `supabase/config.toml` with no user or signature check in the code, so anyone with the URL can call them (and spend your AI credit).
 8. **Stripe webhooks not verified**: handlers that don't check Stripe's signature accept fake "paid" events.
 9. **Functions that run SQL the caller sends**: a public Postgres function that `execute`s a text parameter (like `exec_sql(query text)`) lets anyone with your anon key run their own SQL, and with `security definer` it bypasses RLS. Supabase's Security Advisor lints 0031/0032 describe this; the quick scan flags it in your migrations, locally, with no code upload.
-10. **Database functions a signed-out visitor can call**: turning RLS on doesn't cover database functions. A `security definer` function runs as its owner, and Postgres lets everyone call new functions by default, so anyone with your anon key can call it at `/rest/v1/rpc/<name>` unless you revoke `execute` from both `public` and `anon`. The quick scan flags these in your migrations (rule RLS-011, Supabase lint 0028), skips trigger functions and the ones check 9 already reports. Limits: it only reads migrations, and signed-in-only (`authenticated`) access isn't flagged.
+10. **Database functions a signed-out visitor can call**: turning RLS on doesn't cover database functions. A `security definer` function runs as its owner, and Postgres lets everyone call new functions by default, so anyone with your anon key can call it at `/rest/v1/rpc/<name>` unless you revoke `execute` from both `public` and `anon`. The quick scan flags these in your migrations (rule RLS-011, Supabase lint 0028), skips trigger functions and the ones check 9 already reports. Limits: it only reads migrations, and signed-in-only (`authenticated`) access isn't flagged. A schema-scoped `alter default privileges ... in schema public revoke ... from public` doesn't count as a fix for `public`; only the global form does.
+11. **Default grants that make every new table public again**: since Supabase's 30 Oct 2026 change, new tables get no Data API grants, and a common fix for "permission denied for table" is `alter default privileges ... grant ... on tables to anon, authenticated`. That re-exposes every table you create from then on, with or without RLS. The quick scan flags it (rule RLS-014), along with `grant ... on all tables in schema public to anon`, in your migrations, locally, with no code upload. Limits: regex-based, and a later `revoke` that cancels an earlier grant isn't tracked.
+
+### Changelog
+- **v0.2.1**: new check 11 (RLS-014): default or bulk table grants to `anon`/`authenticated`/`public`. RLS-011 now accepts only the global form of a default-privileges revoke from `public`. 57 fixtures.
+- **v0.2.0**: new check 10 (RLS-011): `security definer` functions a signed-out visitor can call.
 
 Each failed check names the free skill that fixes it. [See what it prints](skills/ship-ready-quick-scan/SKILL.md).
 Also tells you if you're still on the eyJ keys Supabase retires by end of 2026.
@@ -142,7 +147,7 @@ When to use → numbered steps → copy-paste commands/code → output format �
 |---|---|---|---|
 | Price | Free, MIT | $39 one-time | $129 per app |
 | What | 53 single-task skills | 10 named agents: Harbor (lead) + Sentinel, Warden, Keymaster, Tally, Pilot, Torque, Medic, Beacon, Proof | We run the Crew on your repo; a human reviews the result |
-| Scanner | free quick scan: 10 checks (13 of the 59 rules) | 59-check offline scanner (59 rules) with file:line evidence, CI exit code | included |
+| Scanner | free quick scan: 11 checks (14 of the 59 rules) | 59-check offline scanner (59 rules) with file:line evidence, CI exit code | included |
 | Output | your agent's notes | Ship score /100, verdict, findings JSON/MD, Excel scorecard, fix plan, patches | PDF + Markdown report, fix plan + patches, one re-scan |
 | Worked example | none | PromptPad: 0/100 → 99/100, 49 findings, full patch | your app |
 

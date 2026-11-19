@@ -8,7 +8,7 @@ description: Router for the Ship-Ready Lite skills. Use first when a vibe-coded 
 You route the user to the right Ship-Ready Lite skill. Ask at most 3 questions (stack, live or not, the symptom), then name the skill(s) and run them in order. Never run more than one fix at a time; re-check after each.
 
 ## Pre-launch order (no specific symptom)
-0. `ship-ready-quick-scan` (8 day-one checks, prints what to fix first) → 1. `secret-leak-check` → 2. `public-env-audit` → 3. `service-role-split` (if flagged) → 4. `rls-quick-check` → 5. `rls-policy-writer` + `storage-bucket-lockdown` → 6. `protect-routes-nextjs` / `edge-function-auth` → 7. `stripe-webhook-verify` + `stripe-checkout-server` + `entitlements-table` → 8. `env-var-inventory` + `vercel-build-fix` → 9. `security-headers` + `api-rate-limit` → 10. `error-and-uptime-alerts` + `backups-and-restore` → 11. `seo-metadata` + `legal-pages-draft` + `launch-post-drafts`.
+0. `ship-ready-quick-scan` (11 day-one checks, prints what to fix first) → 1. `secret-leak-check` → 2. `public-env-audit` → 3. `service-role-split` (if flagged) → 4. `rls-quick-check` → 5. `rls-policy-writer` + `storage-bucket-lockdown` → 6. `protect-routes-nextjs` / `edge-function-auth` → 7. `stripe-webhook-verify` + `stripe-checkout-server` + `entitlements-table` → 8. `env-var-inventory` + `vercel-build-fix` → 9. `security-headers` + `api-rate-limit` → 10. `error-and-uptime-alerts` + `backups-and-restore` → 11. `seo-metadata` + `legal-pages-draft` + `launch-post-drafts`.
 Critical items first: anything that exposes data, keys or money blocks launch.
 
 ## Symptom → skill

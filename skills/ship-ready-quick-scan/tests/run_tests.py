@@ -52,6 +52,16 @@ CASES = {
     "rls011-f7": ("NO DAY-ONE BLOCKERS", ["RLS-011", "[FAIL] 10.", "MEDIUM"], []),
     "rls011-f8": ("DO NOT SHIP", ["SQL-001", "[FAIL] 9.", "[PASS] 10."], ["`exec_sql()` is security definer (runs as the owner, RLS skipped)"]),
     "rls011-f9": ("FIX BEFORE LAUNCH", ["RLS-011", "[FAIL] 10.", "granted to anon/public"], []),
+    "rls011-f10": ("FIX BEFORE LAUNCH", ["RLS-011", "[FAIL] 10.", "EXECUTE not revoked from public"], []),
+    "rls014-f1": ("FIX BEFORE LAUNCH", ["RLS-014", "[FAIL] 11.", "anon, authenticated"], []),
+    "rls014-f2": ("NO DAY-ONE BLOCKERS", ["RLS-014", "[FAIL] 11.", "MEDIUM"], []),
+    "rls014-f3": ("NO DAY-ONE BLOCKERS", ["[PASS] 11."], ["RLS-014 ", "[FAIL]"]),
+    "rls014-f4": ("NO DAY-ONE BLOCKERS", ["[PASS] 11."], ["[FAIL]"]),
+    "rls014-f5": ("NO DAY-ONE BLOCKERS", ["[PASS] 11."], ["[FAIL]"]),
+    "rls014-f6": ("FIX BEFORE LAUNCH", ["RLS-014", "[FAIL] 11.", "Bulk grant"], []),
+    "rls014-f7": ("NO DAY-ONE BLOCKERS", ["[PASS] 11."], ["[FAIL]"]),
+    "rls014-f8": ("FIX BEFORE LAUNCH", ["RLS-014", "[FAIL] 11."], []),
+    "rls014-f9": ("NO DAY-ONE BLOCKERS", ["[PASS] 11."], ["[FAIL]"]),
 }
 fails = 0
 for name, (verdict, must, mustnot) in CASES.items():

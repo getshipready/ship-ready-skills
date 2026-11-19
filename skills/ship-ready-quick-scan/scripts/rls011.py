@@ -27,7 +27,10 @@ def find(sql_files):
                 continue
             n = re.escape(name.lower())
             rv = lambda role: re.search(rf"revoke\s+(all|execute)[^;]*on\s+function\s+(public\.)?\"?{n}\"?[^;]*from[^;]*\b{role}\b", all_sql)
-            off = {r: bool(rv(r)) or _covers(allfn, all_sql, r) or _covers(defpriv, all_sql, r) for r in ("anon", "public")}
+            # Supabase docs: PUBLIC's EXECUTE comes from a GLOBAL default, so a schema-scoped `alter default privileges ... in schema ...` revoke from public has no effect on it; only the global form counts for public.
+            defpriv_ok = {"anon": _covers(defpriv, all_sql, "anon"),
+                          "public": any(re.search(r"from[^;]*\bpublic\b", m.group(0)) for m in re.finditer(defpriv, all_sql) if not re.search(r"\bin\s+schema\b", m.group(0)))}
+            off = {r: bool(rv(r)) or _covers(allfn, all_sql, r) or defpriv_ok[r] for r in ("anon", "public")}
             regrant = re.search(rf"grant\s+(all|execute)[^;]*on\s+function\s+(public\.)?\"?{n}\"?[^;]*to[^;]*\b(anon|public)\b", all_sql)
             if off["anon"] and off["public"] and not regrant:
                 continue
