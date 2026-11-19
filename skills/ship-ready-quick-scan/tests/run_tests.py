@@ -145,7 +145,20 @@ with tempfile.TemporaryDirectory() as _root:
         errs += [f"missing {x!r}" for x in must if x not in out] + [f"unexpected {x!r}" for x in mustnot if x in out]
         print(("ok   " if not errs else "FAIL ") + name + ("" if not errs else "  " + "; ".join(errs)))
         fails += bool(errs)
+# --no-promo / SHIPREADY_NO_PROMO
+PROMO = [("promo-default-shows-crew", [], {}, True), ("promo-flag-hides", ["--no-promo"], {}, False),
+         ("promo-env-hides", [], {"SHIPREADY_NO_PROMO": "1"}, False), ("promo-env-zero-shows", [], {"SHIPREADY_NO_PROMO": "0"}, True),
+         ("promo-flag-with-fail-on", ["--no-promo", "--fail-on=critical"], {}, False)]
+for name, extra, env, shows in PROMO:
+    r = subprocess.run([sys.executable, QS, FX("sql001-f1"), *extra], capture_output=True, text=True, env={**os.environ, "SHIPREADY_NO_PROMO": "", **env})
+    out = r.stdout; has = "Get the Crew" in out or "$39" in out
+    errs = []
+    if has != shows: errs.append(f"promo present={has}, expected {shows}")
+    if "Result: " not in out or "Static heuristics" not in out: errs.append("scan output incomplete")
+    if not shows and "Full rule list: https://github.com/getshipready/ship-ready-skills" not in out: errs.append("neutral line missing")
+    print(("ok   " if not errs else "FAIL ") + name + ("" if not errs else "  " + "; ".join(errs)))
+    fails += bool(errs)
 PUBENV_N = 5
-total = len(CASES) + len(EXIT) + PUBENV_N
+total = len(CASES) + len(EXIT) + PUBENV_N + len(PROMO)
 print(f"\n{total - fails}/{total} passed")
 sys.exit(1 if fails else 0)

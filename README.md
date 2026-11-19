@@ -52,12 +52,13 @@ What the 12 checks look for:
 12. **Roles read from `user_metadata`**: `user_metadata` is editable by any signed-in user (`supabase.auth.updateUser({ data })`), so a policy that checks `user_metadata.role` lets anyone make themselves admin. The policy part matches Supabase Advisor lint 0015 (`rls_references_user_metadata`); the quick scan also flags sign-up triggers and helper functions that take a role, plan or tenant from `user_metadata`, in your migrations, locally, with no code upload (rule AUTH-013, which is not in the Crew scanner yet). Limits: regex-based, and it only reads migrations; policies edited in the dashboard are not in the repo.
 
 ### Run it on every pull request
-Add `--fail-on=high` (or `--fail-on=critical`) and the scan exits with code 1 when it finds a blocker, so a CI check goes red. Without the flag, the exit code stays 0. Copy [examples/github-actions/ship-ready-quick-scan.yml](examples/github-actions/ship-ready-quick-scan.yml) to `.github/workflows/` in your app repo. It runs locally on the CI runner, no code upload, and pins the scanner to the `v0.2.6` tag.
+Add `--fail-on=high` (or `--fail-on=critical`) and the scan exits with code 1 when it finds a blocker, so a CI check goes red. Without the flag, the exit code stays 0. Copy [examples/github-actions/ship-ready-quick-scan.yml](examples/github-actions/ship-ready-quick-scan.yml) to `.github/workflows/` in your app repo. It runs locally on the CI runner, no code upload, and pins the scanner to the `v0.2.7` tag.
 ```bash
 python3 skills/ship-ready-quick-scan/scripts/quickscan.py . --fail-on=high
 ```
 
 ### Changelog
+- **v0.2.7**: new `--no-promo` flag (or env `SHIPREADY_NO_PROMO=1`) leaves out the closing note about the paid Crew and prints one link to the rule list instead. Findings and exit codes are unchanged.
 - **v0.2.6**: public-env check (SEC-003) now also flags provider keys behind browser prefixes (Resend, Gemini, Groq, Mistral, DeepSeek, OpenRouter, Replicate, ElevenLabs, SendGrid, Mailgun, Twilio, xAI, Perplexity, Cohere, any `STRIPE` name) and skips browser-safe names (publishable/anon keys, URLs, IDs, Mapbox, PostHog, Sentry DSN, Turnstile, reCAPTCHA); secret check catches Mapbox secret tokens (`sk.eyJ…`). The scan reads the files in your repo.
 - **v0.2.5**: secret check now catches Supabase `sb_secret_` keys (critical, they bypass RLS), real-format Resend keys (`re_xxxxxxxx_…`, previously missed), GitHub fine-grained tokens (`github_pat_`) and Groq keys (`gsk_`).
 - **v0.2.4**: fix for the GitHub Actions example: the scan skips the `.ship-ready` folder the workflow checks the scanner out into, so it no longer reports the scanner's own test fixtures as findings in your repo. Proven live in [qs-ci-demo](https://github.com/getshipready/qs-ci-demo).

@@ -6,6 +6,8 @@ Usage:
   python3 quickscan.py PATH --fail-on=critical|high
                                        # same, but exit 1 if a critical (or critical/high) blocker is found (for CI)
 
+Add --no-promo (or set SHIPREADY_NO_PROMO=1) to leave out the closing note about the paid Crew.
+
 Without --fail-on the exit code is always 0 after a scan.
 
 Runs 12 checks (14 of the 59 rules in the full Ship-Ready scanner, Ship-Ready Crew, plus AUTH-013): the ones that
@@ -17,7 +19,7 @@ import base64, json, os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sql001, rls011, rls014, auth013
 
-VERSION = "0.2.6"
+VERSION = "0.2.7"
 FULL_RULES = 59          # rule IDs in the full scanner (crew/shared/scripts/shipready_scan.py v1.0.0)
 SITE = "https://getshipready.github.io"
 SAMPLE_URL = SITE + "/sample"
@@ -417,6 +419,10 @@ def render_third_party(providers, notes):
 def main():
     args = sys.argv[1:]
     fail_on = None
+    no_promo = os.environ.get("SHIPREADY_NO_PROMO", "") not in ("", "0")
+    if "--no-promo" in args:
+        no_promo = True
+        args = [a for a in args if a != "--no-promo"]
     for a in list(args):
         if a.startswith("--fail-on="):
             fail_on = a.split("=", 1)[1]
@@ -495,15 +501,19 @@ def main():
                 "Do database changes as new migration files, not edits to old ones.",
                 "If a step has to be done outside the code (revoking a key, a dashboard setting), list it for me at the end instead of skipping it.",
                 "When you're done, run the quick scan again and show me the result.", ""]
-    out += ["-" * 72,
-            f"That was the quick scan: {len(CHECKS)} day-one checks for leaked keys, open data and unpaid upgrades.",
-            f"Ship-Ready Crew: {FULL_RULES - nrules} more checks (self-promotion to admin/Pro, client-only admin checks,",
-            "public storage buckets, Stripe price tampering and entitlements, deploy, performance, launch basics),",
-            "a ship score /100, a fix plan with patches, and Proof: Playwright launch tests for your money paths.",
-            "One-time $39, 10 agents.",
-            f"  See a full sample report (49 findings on our demo app): {SAMPLE_URL}",
-            f"  Get the Crew: {CREW_URL}",
-            "",
+    out += ["-" * 72]
+    if no_promo:
+        out += [f"That was the quick scan: {len(CHECKS)} day-one checks for leaked keys, open data and unpaid upgrades.",
+                "Full rule list: https://github.com/getshipready/ship-ready-skills"]
+    else:
+        out += [f"That was the quick scan: {len(CHECKS)} day-one checks for leaked keys, open data and unpaid upgrades.",
+                f"Ship-Ready Crew: {FULL_RULES - nrules} more checks (self-promotion to admin/Pro, client-only admin checks,",
+                "public storage buckets, Stripe price tampering and entitlements, deploy, performance, launch basics),",
+                "a ship score /100, a fix plan with patches, and Proof: Playwright launch tests for your money paths.",
+                "One-time $39, 10 agents.",
+                f"  See a full sample report (49 findings on our demo app): {SAMPLE_URL}",
+                f"  Get the Crew: {CREW_URL}"]
+    out += ["",
             "Static heuristics, not a penetration test. A PASS means the pattern was not found, not that the area is safe."]
     print("\n".join(out))
     if fail_on == "critical" and crit:
