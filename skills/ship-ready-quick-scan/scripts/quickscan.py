@@ -3,6 +3,10 @@
 
 Usage:
   python3 quickscan.py PATH            # scan the app folder at PATH, print the result
+  python3 quickscan.py PATH --fail-on=critical|high
+                                       # same, but exit 1 if a critical (or critical/high) blocker is found (for CI)
+
+Without --fail-on the exit code is always 0 after a scan.
 
 Runs 11 checks (14 of the 59 rules) in the full Ship-Ready scanner (Ship-Ready Crew): the ones that
 expose keys, data or money on day one. Same detection logic as the full scanner for these rules.
@@ -13,7 +17,7 @@ import base64, json, os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sql001, rls011, rls014
 
-VERSION = "0.2.1"
+VERSION = "0.2.2"
 FULL_RULES = 59          # rule IDs in the full scanner (crew/shared/scripts/shipready_scan.py v1.0.0)
 SITE = "https://getshipready.github.io"
 SAMPLE_URL = SITE + "/sample"
@@ -398,9 +402,15 @@ def render_third_party(providers, notes):
 
 
 def main():
-    if len(sys.argv) != 2 or sys.argv[1] in ("-h", "--help"):
+    args = sys.argv[1:]
+    fail_on = None
+    for a in list(args):
+        if a.startswith("--fail-on="):
+            fail_on = a.split("=", 1)[1]
+            args.remove(a)
+    if len(args) != 1 or args[0] in ("-h", "--help") or fail_on not in (None, "critical", "high"):
         sys.exit(__doc__)
-    path = sys.argv[1]
+    path = args[0]
     if not os.path.isdir(path):
         sys.exit(f"Not a directory: {path}")
     repo = Repo(path)
@@ -441,7 +451,7 @@ def main():
             body.append("   Skipped: " + ("no Stripe usage found." if cid == "webhook" else "no SQL migrations in the repo; run the Lite skill `rls-quick-check` in the Supabase SQL editor."))
         body.append("")
     applicable = sum(1 for l in body if l.startswith("[PASS]") or l.startswith("[FAIL]"))
-    verdict = "DO NOT SHIP" if crit else ("FIX BEFORE LAUNCH" if high else f"NO DAY-ONE BLOCKERS FOUND ({len(CHECKS)} checks only)")
+    verdict = "NOTHING TO SCAN: no Supabase or app files were found in this folder (0 files read, no checks run)" if not repo.files else "DO NOT SHIP" if crit else ("FIX BEFORE LAUNCH" if high else f"NO DAY-ONE BLOCKERS FOUND ({len(CHECKS)} checks only)")
     nrules = len({r for c in CHECKS for r in c[2]})
     info = render_legacy_keys(*legacy_keys(repo))
     if info:
@@ -483,6 +493,10 @@ def main():
             "",
             "Static heuristics, not a penetration test. A PASS means the pattern was not found, not that the area is safe."]
     print("\n".join(out))
+    if fail_on == "critical" and crit:
+        sys.exit(1)
+    if fail_on == "high" and (crit or high):
+        sys.exit(1)
 
 
 if __name__ == "__main__":

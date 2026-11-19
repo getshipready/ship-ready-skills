@@ -74,5 +74,25 @@ for name, (verdict, must, mustnot) in CASES.items():
     errs += [f"unexpected {s!r}" for s in mustnot if s in out]
     print(("ok   " if not errs else "FAIL ") + name + ("" if not errs else "  " + "; ".join(errs)))
     fails += bool(errs)
-print(f"\n{len(CASES) - fails}/{len(CASES)} passed")
+import tempfile
+FX = lambda n: os.path.join(HERE, "fixtures", n)
+def run(*a): return subprocess.run([sys.executable, QS, *a], capture_output=True, text=True)
+with tempfile.TemporaryDirectory() as empty:
+    EXIT = [  # (name, args, expected exit code, text that must appear)
+        ("exit-default-critical-is-0", [FX("sql001-f1")], 0, "DO NOT SHIP"),
+        ("exit-fail-on-critical-critical", [FX("sql001-f1"), "--fail-on=critical"], 1, "DO NOT SHIP"),
+        ("exit-fail-on-critical-high-only", [FX("rls011-f1"), "--fail-on=critical"], 0, "FIX BEFORE LAUNCH"),
+        ("exit-fail-on-high-high", [FX("rls011-f1"), "--fail-on=high"], 1, "FIX BEFORE LAUNCH"),
+        ("exit-fail-on-high-clean", [FX("rls011-f3"), "--fail-on=high"], 0, "NO DAY-ONE BLOCKERS"),
+        ("exit-fail-on-bad-value", [FX("rls011-f3"), "--fail-on=low"], 1, "Usage"),
+        ("empty-folder", [empty, "--fail-on=high"], 0, "no Supabase or app files were found"),
+    ]
+    for name, a, code, text in EXIT:
+        r = run(*a); out = r.stdout + r.stderr
+        errs = ([f"exit {r.returncode} != {code}"] if r.returncode != code else []) + ([f"missing {text!r}"] if text not in out else [])
+        if name == "empty-folder" and "NO DAY-ONE BLOCKERS" in out: errs.append("empty folder reported no blockers")
+        print(("ok   " if not errs else "FAIL ") + name + ("" if not errs else "  " + "; ".join(errs)))
+        fails += bool(errs)
+total = len(CASES) + len(EXIT)
+print(f"\n{total - fails}/{total} passed")
 sys.exit(1 if fails else 0)

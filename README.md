@@ -35,7 +35,7 @@ claude "Use ship-ready-quick-scan on this app"
 # or, without an agent (Python 3, standard library only):
 python3 skills/ship-ready-quick-scan/scripts/quickscan.py path/to/app
 ```
-Tests: `python3 skills/ship-ready-quick-scan/tests/run_tests.py` (57 fixtures).
+Tests: `python3 skills/ship-ready-quick-scan/tests/run_tests.py` (64 tests: 57 fixtures + 7 exit-code and empty-folder checks).
 
 What the 11 checks look for:
 1. **Leaked keys in your code**: Stripe keys, API keys or the Supabase `service_role` key committed to the repo.
@@ -50,7 +50,14 @@ What the 11 checks look for:
 10. **Database functions a signed-out visitor can call**: turning RLS on doesn't cover database functions. A `security definer` function runs as its owner, and Postgres lets everyone call new functions by default, so anyone with your anon key can call it at `/rest/v1/rpc/<name>` unless you revoke `execute` from both `public` and `anon`. The quick scan flags these in your migrations (rule RLS-011, Supabase lint 0028), skips trigger functions and the ones check 9 already reports. Limits: it only reads migrations, and signed-in-only (`authenticated`) access isn't flagged. A schema-scoped `alter default privileges ... in schema public revoke ... from public` doesn't count as a fix for `public`; only the global form does.
 11. **Default grants that make every new table public again**: since Supabase's 30 Oct 2026 change, new tables get no Data API grants, and a common fix for "permission denied for table" is `alter default privileges ... grant ... on tables to anon, authenticated`. That re-exposes every table you create from then on, with or without RLS. The quick scan flags it (rule RLS-014), along with `grant ... on all tables in schema public to anon`, in your migrations, locally, with no code upload. Limits: regex-based, and a later `revoke` that cancels an earlier grant isn't tracked.
 
+### Run it on every pull request
+Add `--fail-on=high` (or `--fail-on=critical`) and the scan exits with code 1 when it finds a blocker, so a CI check goes red. Without the flag, the exit code stays 0. Copy [examples/github-actions/ship-ready-quick-scan.yml](examples/github-actions/ship-ready-quick-scan.yml) to `.github/workflows/` in your app repo. It runs locally on the CI runner, no code upload, and pins the scanner to the `v0.2.2` tag.
+```bash
+python3 skills/ship-ready-quick-scan/scripts/quickscan.py . --fail-on=high
+```
+
 ### Changelog
+- **v0.2.2**: optional `--fail-on=critical|high` (exit 1 on blockers; default behavior unchanged). Scanning a folder with no files now says no Supabase or app files were found instead of "no blockers". GitHub Actions example. 64 tests.
 - **v0.2.1**: new check 11 (RLS-014): default or bulk table grants to `anon`/`authenticated`/`public`. RLS-011 now accepts only the global form of a default-privileges revoke from `public`. 57 fixtures.
 - **v0.2.0**: new check 10 (RLS-011): `security definer` functions a signed-out visitor can call.
 
