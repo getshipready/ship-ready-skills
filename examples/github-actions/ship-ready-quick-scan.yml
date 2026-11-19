@@ -2,7 +2,7 @@
 # Runs the free Ship-Ready quick scan on every pull request.
 # Fails the check when it finds a critical or high launch blocker (--fail-on=high).
 # Runs locally on the CI runner: no secrets, no code upload, no network calls during the scan.
-# The scanner is pinned to the v0.2.3 tag, so a later change to this repo can't alter your CI.
+# The scanner is pinned to the v0.2.4 tag, so a later change to this repo can't alter your CI.
 name: Ship-Ready quick scan
 on:
   pull_request:
@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: getshipready/ship-ready-skills
-          ref: v0.2.3
+          ref: v0.2.4
           path: .ship-ready
       - uses: actions/setup-python@v5
         with:

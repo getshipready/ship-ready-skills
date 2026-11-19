@@ -17,13 +17,13 @@ import base64, json, os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sql001, rls011, rls014, auth013
 
-VERSION = "0.2.3"
+VERSION = "0.2.4"
 FULL_RULES = 59          # rule IDs in the full scanner (crew/shared/scripts/shipready_scan.py v1.0.0)
 SITE = "https://getshipready.github.io"
 SAMPLE_URL = SITE + "/sample"
 CREW_URL = SITE + "/crew"
 SKIP_DIRS = {"node_modules", ".next", ".git", "dist", "build", ".vercel", ".turbo", "coverage", ".svelte-kit", "out",
-             ".claude", ".cursor", ".agents", "playwright-report", "test-results", ".auth"}
+             ".claude", ".cursor", ".agents", "playwright-report", "test-results", ".auth", ".ship-ready"}
 CODE_EXT = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".vue", ".svelte"}
 TEXT_EXT = CODE_EXT | {".sql", ".json", ".env", ".md", ".html", ".toml", ".yaml", ".yml", ".txt"}
 SEV_ORDER = {"critical": 4, "high": 3, "medium": 2, "low": 1}
