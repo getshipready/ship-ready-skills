@@ -17,7 +17,7 @@ import base64, json, os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sql001, rls011, rls014, auth013
 
-VERSION = "0.2.4"
+VERSION = "0.2.5"
 FULL_RULES = 59          # rule IDs in the full scanner (crew/shared/scripts/shipready_scan.py v1.0.0)
 SITE = "https://getshipready.github.io"
 SAMPLE_URL = SITE + "/sample"
@@ -187,7 +187,10 @@ SECRET_PATTERNS = [
     (r"AKIA[0-9A-Z]{16}", "AWS access key ID", "critical"),
     (r"gh[pousr]_[0-9A-Za-z]{30,}", "GitHub token", "critical"),
     (r"xox[abposr]-[0-9A-Za-z\-]{10,}", "Slack token", "high"),
-    (r"re_[0-9A-Za-z]{20,}", "Resend API key", "high"),
+    (r"re_[0-9A-Za-z]{8}_[0-9A-Za-z]{24}(?![0-9A-Za-z_])|re_[0-9A-Za-z]{20,}", "Resend API key", "high"),
+    (r"sb_secret_[0-9A-Za-z_\-]{20,}", "Supabase secret key (sb_secret_, bypasses RLS)", "critical"),
+    (r"github_pat_[0-9A-Za-z_]{50,}", "GitHub fine-grained token", "critical"),
+    (r"gsk_[0-9A-Za-z]{40,}", "Groq API key", "high"),
     (r"-----BEGIN (?:RSA |EC )?PRIVATE KEY-----", "Private key", "critical"),
 ]
 JWT_RX = re.compile(r"eyJ[0-9A-Za-z_\-]+\.(eyJ[0-9A-Za-z_\-]+)\.[0-9A-Za-z_\-]+")

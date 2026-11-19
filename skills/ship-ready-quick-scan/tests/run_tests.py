@@ -5,6 +5,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 QS = os.path.join(HERE, "..", "scripts", "quickscan.py")
 # fixture: (expected verdict prefix, strings that must appear, strings that must NOT appear)
 CASES = {
+    "key002-bad": ("FIX BEFORE LAUNCH", ["SEC-001", "Resend API key"], []),
+    "key002-good": ("NO DAY-ONE BLOCKERS", [], ["[FAIL]"]),
+    "key002-newkeys": ("DO NOT SHIP", ["SEC-001", "sb_secret_", "GitHub fine-grained token", "Groq API key"], []),
+    "key002-goodnew": ("NO DAY-ONE BLOCKERS", [], ["[FAIL]"]),
     "auth010-f1-open-ai-fn":        ("FIX BEFORE LAUNCH", ["AUTH-010", "[FAIL] 7."], ["Pause AI"]),
     "auth010-f2-stripe-webhook":    ("NO DAY-ONE BLOCKERS", ["[PASS] 7."], []),
     "auth010-f3-checked-fn":        ("NO DAY-ONE BLOCKERS", ["[PASS] 7."], []),
@@ -71,6 +75,14 @@ CASES = {
     "usermeta-f7": ("DO NOT SHIP", ["AUTH-013", "[FAIL] 12."], []),
     "usermeta-f8": ("NO DAY-ONE BLOCKERS", ["[PASS] 12."], ["[FAIL]"]),
 }
+# key002-newkeys holds fake keys in real formats. It is written at test time so GitHub
+# push protection doesn't treat the fixture as a leaked secret.
+_nk = os.path.join(HERE, "fixtures", "key002-newkeys", "src")
+os.makedirs(_nk, exist_ok=True)
+with open(os.path.join(_nk, "admin.ts"), "w") as _f:
+    _f.write('const admin = createClient(url, "' + "sb_" + "secret_" + "FAKEfake0000Test1111xyz_TEST" + '");\n')
+    _f.write('const gh = "' + "github" + "_pat_" + "11FAKE0000TEST" + "x" * 30 + "_" + "y" * 40 + '";\n')
+    _f.write('const groq = "' + "gsk" + "_" + "FakeTestKey0" * 4 + '";\n')
 fails = 0
 for name, (verdict, must, mustnot) in CASES.items():
     out = subprocess.run([sys.executable, QS, os.path.join(HERE, "fixtures", name)], capture_output=True, text=True).stdout
