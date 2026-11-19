@@ -43,6 +43,15 @@ CASES = {
     "sql001-f7": ("DO NOT SHIP", ["SQL-001", "[FAIL] 9."], []),
     "sql001-f8": ("DO NOT SHIP", ["SQL-001", "[FAIL] 9."], []),
     "sql001-f9": ("NO DAY-ONE BLOCKERS", ["[PASS] 9."], ["SQL-001 "]),
+    "rls011-f1": ("FIX BEFORE LAUNCH", ["RLS-011", "[FAIL] 10.", "dash_push"], []),
+    "rls011-f2": ("FIX BEFORE LAUNCH", ["RLS-011", "[FAIL] 10.", "EXECUTE not revoked from public"], []),
+    "rls011-f3": ("NO DAY-ONE BLOCKERS", ["[PASS] 10."], ["RLS-011 ", "[FAIL]"]),
+    "rls011-f4": ("NO DAY-ONE BLOCKERS", ["[PASS] 10."], ["[FAIL]"]),
+    "rls011-f5": ("NO DAY-ONE BLOCKERS", ["[PASS] 10."], ["[FAIL]"]),
+    "rls011-f6": ("NO DAY-ONE BLOCKERS", ["[PASS] 10."], ["[FAIL]"]),
+    "rls011-f7": ("NO DAY-ONE BLOCKERS", ["RLS-011", "[FAIL] 10.", "MEDIUM"], []),
+    "rls011-f8": ("DO NOT SHIP", ["SQL-001", "[FAIL] 9.", "[PASS] 10."], ["`exec_sql()` is security definer (runs as the owner, RLS skipped)"]),
+    "rls011-f9": ("FIX BEFORE LAUNCH", ["RLS-011", "[FAIL] 10.", "granted to anon/public"], []),
 }
 fails = 0
 for name, (verdict, must, mustnot) in CASES.items():

@@ -4,16 +4,16 @@
 Usage:
   python3 quickscan.py PATH            # scan the app folder at PATH, print the result
 
-Runs 9 checks (12 of the 59 rules) in the full Ship-Ready scanner (Ship-Ready Crew): the ones that
+Runs 10 checks (13 of the 59 rules) in the full Ship-Ready scanner (Ship-Ready Crew): the ones that
 expose keys, data or money on day one. Same detection logic as the full scanner for these rules.
 What it is not: a penetration test or proof of safety. A clean quick scan means "none of these
-9 checks found anything", nothing more. Secrets are redacted in all output. Nothing is sent anywhere.
+10 checks found anything", nothing more. Secrets are redacted in all output. Nothing is sent anywhere.
 """
 import base64, json, os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import sql001
+import sql001, rls011
 
-VERSION = "0.1.9"
+VERSION = "0.2.0"
 FULL_RULES = 59          # rule IDs in the full scanner (crew/shared/scripts/shipready_scan.py v1.0.0)
 SITE = "https://getshipready.github.io"
 SAMPLE_URL = SITE + "/sample"
@@ -35,6 +35,7 @@ CHECKS = [
     ("apiauth", "API routes that skip the caller check", ["AUTH-002", "AUTH-003", "AUTH-010"], "protect-routes-nextjs"),
     ("webhook", "Stripe webhook signature verification", ["PAY-001"], "stripe-webhook-verify"),
     ("rpcsql", "Functions anyone can call to run their own SQL", ["SQL-001"], "rls-policy-writer"),
+    ("defnfn", "Database functions a signed-out visitor can call (`security definer`)", ["RLS-011"], "rls-policy-writer"),
 ]
 
 # check id -> one-line fix instruction for the combined AI-tool prompt
@@ -45,6 +46,7 @@ FIX_TEXT = {
     "rlsoff": "Write a new migration that runs `alter table <name> enable row level security;` and adds owner-based policies (e.g. `using (auth.uid() = user_id)`).",
     "rlsread": "Replace `using (true)` with a policy that only returns rows the signed-in user owns or is meant to see, and stop exposing private columns (email, role, plan) to other users.",
     "rlsview": "Recreate the view `with (security_invoker = true)` so the caller's Row Level Security applies.",
+    "defnfn": "For each function listed, run `revoke execute on function public.<name> from public, anon;` (Postgres lets everyone call new functions by default, so revoking from anon alone is not enough), then grant it back only to `authenticated` if signed-in users need it, or make it `security invoker`. Supabase lint 0028 describes this.",
     "rpcsql": "Drop the function, or revoke execute on it from anon, authenticated and public. If you must keep it, pass values as parameters (`execute ... using`) and wrap identifiers in quote_ident() instead of concatenating text the caller sends. Supabase lints 0031/0032 describe this.",
     "apiauth": "At the top of each handler, get the signed-in user from the server-side session, return 401 if there is none, and check they own the record before changing it. For a Supabase edge function with verify_jwt = false, set verify_jwt = true (or delete the line) unless it is a webhook that verifies the provider's signature first.",
     "webhook": "Verify every event with `stripe.webhooks.constructEvent(rawBody, signature, STRIPE_WEBHOOK_SECRET)` using the raw request body, and return 400 if verification fails, before acting on it.",
@@ -280,6 +282,9 @@ def scan(repo):
     # SQL-001 (Supabase Advisor lints 0031/0032)
     for f in sql001.find(sqls):
         add("SQL-001", f["severity"], f["title"], f["file"], f["line"], f["evidence"])
+    # RLS-011 (Supabase Advisor lint 0028): definer functions anon can call; skips SQL-001 functions and triggers
+    for f in rls011.find(sqls):
+        add("RLS-011", f["severity"], f["title"], f["file"], f["line"], f["evidence"])
     # AUTH-002 / AUTH-003
     for rel, text in api_route_files(repo).items():
         if AUTH_RX.search(text) or "constructEvent" in text or re.search(r"webhook", rel, re.I):
@@ -407,7 +412,7 @@ def main():
     for n, (cid, title, rules, skill) in enumerate(CHECKS, 1):
         hits = sorted((f for f in real if f["id"] in rules), key=lambda f: (-SEV_ORDER[f["severity"]], f["file"] or "", f["line"] or 0))
         infos = sorted((f for f in F if f["id"] in rules and f["severity"] == "info"), key=lambda f: (f["file"] or "", f["line"] or 0))
-        na = (cid == "webhook" and not uses_stripe) or (cid in ("rlsoff", "rlsread", "rlsview", "rpcsql") and not repo.sql())
+        na = (cid == "webhook" and not uses_stripe) or (cid in ("rlsoff", "rlsread", "rlsview", "rpcsql", "defnfn") and not repo.sql())
         if hits:
             status = "FAIL"
         elif na:
@@ -431,7 +436,7 @@ def main():
             body.append("   Skipped: " + ("no Stripe usage found." if cid == "webhook" else "no SQL migrations in the repo; run the Lite skill `rls-quick-check` in the Supabase SQL editor."))
         body.append("")
     applicable = sum(1 for l in body if l.startswith("[PASS]") or l.startswith("[FAIL]"))
-    verdict = "DO NOT SHIP" if crit else ("FIX BEFORE LAUNCH" if high else "NO DAY-ONE BLOCKERS FOUND (9 checks only)")
+    verdict = "DO NOT SHIP" if crit else ("FIX BEFORE LAUNCH" if high else "NO DAY-ONE BLOCKERS FOUND (10 checks only)")
     nrules = len({r for c in CHECKS for r in c[2]})
     info = render_legacy_keys(*legacy_keys(repo))
     if info:
