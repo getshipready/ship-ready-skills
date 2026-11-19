@@ -17,7 +17,7 @@ import base64, json, os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sql001, rls011, rls014, auth013
 
-VERSION = "0.2.5"
+VERSION = "0.2.6"
 FULL_RULES = 59          # rule IDs in the full scanner (crew/shared/scripts/shipready_scan.py v1.0.0)
 SITE = "https://getshipready.github.io"
 SAMPLE_URL = SITE + "/sample"
@@ -191,6 +191,7 @@ SECRET_PATTERNS = [
     (r"sb_secret_[0-9A-Za-z_\-]{20,}", "Supabase secret key (sb_secret_, bypasses RLS)", "critical"),
     (r"github_pat_[0-9A-Za-z_]{50,}", "GitHub fine-grained token", "critical"),
     (r"gsk_[0-9A-Za-z]{40,}", "Groq API key", "high"),
+    (r"sk\.eyJ[0-9A-Za-z_\-]{20,}\.[0-9A-Za-z_\-]{10,}", "Mapbox secret token (sk.)", "high"),
     (r"-----BEGIN (?:RSA |EC )?PRIVATE KEY-----", "Private key", "critical"),
 ]
 JWT_RX = re.compile(r"eyJ[0-9A-Za-z_\-]+\.(eyJ[0-9A-Za-z_\-]+)\.[0-9A-Za-z_\-]+")
@@ -258,11 +259,15 @@ def scan(repo):
                     continue
                 add("SEC-001", "critical", "Supabase service_role key committed", rel, line_of(text, m.start()), redact(m.group(0)))
     # SEC-003
-    pub = re.compile(r"\b(NEXT_PUBLIC_|VITE_|EXPO_PUBLIC_|REACT_APP_|PUBLIC_)([A-Z0-9_]*(SECRET|SERVICE_ROLE|PRIVATE|SK_|STRIPE_SECRET|OPENAI|ANTHROPIC|PASSWORD|TOKEN)[A-Z0-9_]*)")
+    pub = re.compile(r"\b(NEXT_PUBLIC_|VITE_|EXPO_PUBLIC_|REACT_APP_|PUBLIC_)([A-Z0-9_]*(SECRET|SERVICE_ROLE|PRIVATE|SK_|STRIPE|OPENAI|ANTHROPIC|PASSWORD|TOKEN|RESEND|GEMINI|GROQ|MISTRAL|DEEPSEEK|OPENROUTER|REPLICATE|ELEVENLABS|SENDGRID|MAILGUN|TWILIO|XAI_|PERPLEXITY|COHERE)[A-Z0-9_]*)")
+    # Browser-safe by design: Stripe publishable keys, Supabase anon/publishable, URLs, IDs.
+    pub_safe = re.compile(r"PUBLISHABLE|_PK\b|_PK_|ANON|_URL\b|_ID\b|SITE_KEY|PRICE|PRODUCT|_LINK\b|PAYMENT_LINK|BUY_BUTTON|MAPBOX|POSTHOG|SENTRY_DSN|TURNSTILE|RECAPTCHA")
     seen_vars = set()
     for rel, text in repo.files.items():
         for m in pub.finditer(text):
             if m.group(0) in seen_vars:
+                continue
+            if pub_safe.search(m.group(0)):
                 continue
             seen_vars.add(m.group(0))
             add("SEC-003", "critical", f"Secret exposed to the browser: {m.group(0)}", rel, line_of(text, m.start()), m.group(0))

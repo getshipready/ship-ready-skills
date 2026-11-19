@@ -113,6 +113,39 @@ with tempfile.TemporaryDirectory() as empty:
         if name == "empty-folder" and "NO DAY-ONE BLOCKERS" in out: errs.append("empty folder reported no blockers")
         print(("ok   " if not errs else "FAIL ") + name + ("" if not errs else "  " + "; ".join(errs)))
         fails += bool(errs)
-total = len(CASES) + len(EXIT)
+
+# SEC-003 / Mapbox fixtures: written to a temp dir at test time. Token-shaped values are
+# assembled here so no secret-looking literal is committed (GitHub push protection).
+def _pubenv_cases():
+    tok = "sk." + "eyJ" + "1IjoiZXhhbXBsZSIsImEiOiJ0ZXN0In0" + ".AbCdEfGhIjKlMnOpQrStUv"
+    fx = {
+        "a": {".env": "VITE_SUPABASE_URL=https://x.supabase.co\nVITE_RESEND_API_KEY=placeholder\nVITE_STRIPE_KEY=placeholder\nVITE_GEMINI_API_KEY=placeholder\nVITE_OPENAI_API_KEY=placeholder\nNEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_placeholder\n"},
+        "b": {".env": "EXPO_PUBLIC_OPENAI_API_KEY=placeholder\nEXPO_PUBLIC_REVENUECAT_SECRET=placeholder\nREACT_APP_SENDGRID_API_KEY=placeholder\nNEXT_PUBLIC_GROQ_API_KEY=placeholder\n"},
+        "c": {".env": "NEXT_PUBLIC_MAPBOX_TOKEN=" + tok + "\n", ".gitignore": "node_modules\n"},
+        "safe": {".env": "VITE_STRIPE_PUBLISHABLE_KEY=pk_test_x\nNEXT_PUBLIC_STRIPE_PRICE_ID=price_x\nVITE_SUPABASE_ANON_KEY=x\nVITE_SUPABASE_PUBLISHABLE_KEY=x\nNEXT_PUBLIC_STRIPE_PAYMENT_LINK=https://buy.stripe.com/x\nVITE_SUPABASE_URL=https://x.supabase.co\n"},
+        "safe2": {".env": "NEXT_PUBLIC_MAPBOX_TOKEN=pk.placeholder\nNEXT_PUBLIC_POSTHOG_KEY=phc_placeholder\nNEXT_PUBLIC_SENTRY_DSN=https://x@o1.ingest.sentry.io/1\nVITE_TURNSTILE_SITE_KEY=0x4AAA\nEXPO_PUBLIC_SUPABASE_ANON_KEY=x\n"},
+    }
+    return fx, [
+        ("pubenv-a-providers", "a", "DO NOT SHIP", ["SEC-003", "VITE_RESEND_API_KEY", "VITE_STRIPE_KEY", "VITE_GEMINI_API_KEY", "VITE_OPENAI_API_KEY"], ["VITE_SUPABASE_URL ", "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY"]),
+        ("pubenv-b-providers", "b", "DO NOT SHIP", ["SEC-003", "EXPO_PUBLIC_OPENAI_API_KEY", "EXPO_PUBLIC_REVENUECAT_SECRET", "REACT_APP_SENDGRID_API_KEY", "NEXT_PUBLIC_GROQ_API_KEY"], []),
+        ("pubenv-c-mapbox-secret", "c", "FIX BEFORE LAUNCH", ["SEC-001", "Mapbox secret token"], ["Secrets behind a public env prefix (NEXT_PUBLIC_, VITE_, EXPO_PUBLIC_)  (SEC-003)\n1."]),
+        ("pubenv-safe", "safe", "NO DAY-ONE BLOCKERS", ["[PASS] 3."], ["exposed to the browser"]),
+        ("pubenv-safe2", "safe2", "NO DAY-ONE BLOCKERS", ["[PASS] 3."], ["exposed to the browser", "Mapbox secret token"]),
+    ]
+_files, _pcases = _pubenv_cases()
+with tempfile.TemporaryDirectory() as _root:
+    for _d, _fs in _files.items():
+        os.makedirs(os.path.join(_root, _d))
+        for _n, _c in _fs.items():
+            open(os.path.join(_root, _d, _n), "w").write(_c)
+    for name, d, verdict, must, mustnot in _pcases:
+        r = run(os.path.join(_root, d)); out = r.stdout + r.stderr
+        res = next((l for l in out.splitlines() if l.startswith("Result: ")), "")
+        errs = ([] if res.startswith("Result: " + verdict) else [f"verdict: {res!r}"])
+        errs += [f"missing {x!r}" for x in must if x not in out] + [f"unexpected {x!r}" for x in mustnot if x in out]
+        print(("ok   " if not errs else "FAIL ") + name + ("" if not errs else "  " + "; ".join(errs)))
+        fails += bool(errs)
+PUBENV_N = 5
+total = len(CASES) + len(EXIT) + PUBENV_N
 print(f"\n{total - fails}/{total} passed")
 sys.exit(1 if fails else 0)
