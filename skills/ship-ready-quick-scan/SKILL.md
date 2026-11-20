@@ -1,6 +1,6 @@
 ---
 name: ship-ready-quick-scan
-description: Free offline quick scan (runs in seconds, standard-library Python) of a vibe-coded app (Lovable, Bolt, v0, Replit, Cursor, Claude Code) for the 12 day-one launch checks - committed secrets, .env not git-ignored, secrets behind NEXT_PUBLIC_/VITE_ prefixes, Supabase tables with RLS off (or disabled by a later migration), `using (true)` read policies, views that skip RLS, API routes with no caller check, unsigned Stripe webhooks, and `security definer` database functions a signed-out visitor can call, default grants that expose every new table, and roles read from user_metadata. Use first, before launch or before making a repo public, when someone asks "is my app safe to ship?" or "scan my app".
+description: Free offline quick scan (runs in seconds, standard-library Python) of a vibe-coded app (Lovable, Bolt, v0, Replit, Cursor, Claude Code) for the 13 day-one launch checks - committed secrets, .env not git-ignored, secrets behind NEXT_PUBLIC_/VITE_ prefixes, Supabase tables with RLS off (or disabled by a later migration), `using (true)` read policies, views that skip RLS, API routes with no caller check, unsigned Stripe webhooks, and `security definer` database functions a signed-out visitor can call, default grants that expose every new table, roles read from user_metadata, and users who can edit their own role, plan or credits column. Use first, before launch or before making a repo public, when someone asks "is my app safe to ship?" or "scan my app".
 ---
 
 # Ship-Ready quick scan
@@ -34,7 +34,7 @@ A ready-to-copy GitHub Actions workflow is in `examples/github-actions/ship-read
 
 ## Output
 ```
-Result: DO NOT SHIP · 1/12 checks passed · 9 critical, 0 high
+Result: DO NOT SHIP · 1/13 checks passed · 9 critical, 0 high
 [FAIL] 4. Supabase tables with Row Level Security off (never enabled, or disabled later)  (RLS-001, RLS-007)
    - CRITICAL supabase/migrations/001_init.sql:26  Table `payments` has Row Level Security disabled
    Fix it free: Lite skill `rls-quick-check`
@@ -43,7 +43,7 @@ Then a short confirmed / false-positive list and the fix order.
 Also tells you if you're still on the eyJ keys Supabase retires by end of 2026.
 
 ## Pitfalls
-- A PASS means the pattern was not found, not that the area is safe. The quick scan covers 12 checks (14 of the full scanner's 59 rules, plus AUTH-013); it does not check client-only admin checks, privilege escalation through update policies, storage buckets, price tampering, deploy, performance or launch basics.
+- A PASS means the pattern was not found, not that the area is safe. The quick scan covers 13 checks (15 of the full scanner's 59 rules, plus AUTH-013); it does not check client-only admin checks, storage buckets, price tampering, deploy, performance or launch basics.
 - A key in a git-ignored `.env` is fine locally; a key that was ever committed must be rotated even after deleting it.
 - Policies changed in the Supabase dashboard are not in the repo. Check live RLS with `rls-quick-check`.
 
@@ -57,4 +57,4 @@ Also tells you if you're still on the eyJ keys Supabase retires by end of 2026.
 Rotating keys, changing provider dashboards, applying production migrations, deploying and charging cards are done by the human. Prepare the exact steps and wait for confirmation.
 
 ---
-Part of the free [Ship-Ready Lite](https://getshipready.github.io/lite/) library. The quick scan runs 14 of the 59 rules in the full Ship-Ready scanner, plus AUTH-013 (not in the Crew yet). The **Ship-Ready Crew** runs all 59 with 10 agents, gives a ship score /100, a fix plan with patches and Playwright launch tests: https://getshipready.github.io/crew/ · sample report: https://getshipready.github.io/sample/
+Part of the free [Ship-Ready Lite](https://getshipready.github.io/lite/) library. The quick scan runs 15 of the 59 rules in the full Ship-Ready scanner, plus AUTH-013 (not in the Crew yet). The **Ship-Ready Crew** runs all 59 with 10 agents, gives a ship score /100, a fix plan with patches and Playwright launch tests: https://getshipready.github.io/crew/ · sample report: https://getshipready.github.io/sample/

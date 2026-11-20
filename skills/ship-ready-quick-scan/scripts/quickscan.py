@@ -10,16 +10,16 @@ Add --no-promo (or set SHIPREADY_NO_PROMO=1) to leave out the closing note about
 
 Without --fail-on the exit code is always 0 after a scan.
 
-Runs 12 checks (14 of the 59 rules in the full Ship-Ready scanner, Ship-Ready Crew, plus AUTH-013): the ones that
+Runs 13 checks (15 of the 59 rules in the full Ship-Ready scanner, Ship-Ready Crew, plus AUTH-013): the ones that
 expose keys, data or money on day one. Same detection logic as the full scanner for these rules.
 What it is not: a penetration test or proof of safety. A clean quick scan means "none of these
-12 checks found anything", nothing more. Secrets are redacted in all output. Nothing is sent anywhere.
+13 checks found anything", nothing more. Secrets are redacted in all output. Nothing is sent anywhere.
 """
 import base64, json, os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sql001, rls011, rls014, auth013
 
-VERSION = "0.2.7"
+VERSION = "0.2.8"
 FULL_RULES = 59          # rule IDs in the full scanner (crew/shared/scripts/shipready_scan.py v1.0.0)
 SITE = "https://getshipready.github.io"
 SAMPLE_URL = SITE + "/sample"
@@ -44,6 +44,7 @@ CHECKS = [
     ("defnfn", "Database functions a signed-out visitor can call (`security definer`)", ["RLS-011"], "rls-policy-writer"),
     ("defgrant", "Default grants that make every new table reachable through the API", ["RLS-014"], "rls-policy-writer"),
     ("usermeta", "Roles or plans read from user_metadata, which signed-in users can edit themselves", ["AUTH-013"], "admin-role-setup"),
+    ("rlsself", "Users can edit their own role, plan or credits column", ["RLS-004"], "rls-policy-writer"),
 ]
 
 # check id -> one-line fix instruction for the combined AI-tool prompt
@@ -54,6 +55,7 @@ FIX_TEXT = {
     "rlsoff": "Write a new migration that runs `alter table <name> enable row level security;` and adds owner-based policies (e.g. `using (auth.uid() = user_id)`).",
     "rlsread": "Replace `using (true)` with a policy that only returns rows the signed-in user owns or is meant to see, and stop exposing private columns (email, role, plan) to other users.",
     "rlsview": "Recreate the view `with (security_invoker = true)` so the caller's Row Level Security applies.",
+    "rlsself": "Stop users changing privilege columns on their own row: `revoke update on table <t> from anon, authenticated;` then `grant update (<safe columns only>) on table <t> to authenticated;`, or move role/plan/credits to a table only the server writes.",
     "defnfn": "For each function listed, run `revoke execute on function public.<name> from public, anon;` (Postgres lets everyone call new functions by default, so revoking from anon alone is not enough), then grant it back only to `authenticated` if signed-in users need it, or make it `security invoker`. Supabase lint 0028 describes this.",
     "usermeta": "Stop authorizing from `user_metadata` / `raw_user_meta_data` (users can change it with `supabase.auth.updateUser`). Read roles from `app_metadata` (`auth.jwt() -> 'app_metadata'`, writable only by the server) or from a roles table users cannot write, and make any sign-up trigger set a safe default role instead of copying one from the metadata.",
     "defgrant": "Remove the `alter default privileges ... grant ... on tables to anon/authenticated` statement (and any `grant ... on all tables in schema public to anon`). Instead grant per table, in the migration that creates it (`grant select, insert on public.<table> to authenticated;`), together with `enable row level security` and a policy.",
@@ -309,6 +311,19 @@ def scan(repo):
     # AUTH-013: policies (matches Supabase Advisor lint 0015) and sign-up triggers / helper functions that take a role from user_metadata
     for f in auth013.find(sqls):
         add("AUTH-013", f["severity"], f["title"], f["file"], f["line"], f["evidence"])
+    # RLS-004 (staged E201): own-row UPDATE policy on a table holding privilege columns, with no column-level grant
+    PRIV_COLS = re.compile(r"\b(role|is_admin|is_pro|plan|tier|credits|balance|stripe_[a-z_]+)\b", re.I)
+    for rel, text in sqls.items():
+        for t, info in parse_tables(text).items():
+            priv = sorted(set(c.lower() for c in PRIV_COLS.findall(info["cols"])))
+            if not priv or re.search(rf"grant\s+update\s*\([^)]*\)\s+on\s+(?:table\s+)?(?:public\.)?\"?{t}\"?", alltext, re.I):
+                continue
+            for pm in re.finditer(rf"create\s+policy\s+\"([^\"]+)\"\s+on\s+(?:public\.)?\"?{t}\"?\s+(?:as\s+\w+\s+)?for\s+(update|all)\b(.*?);", alltext, re.I | re.S):
+                if not re.search(r"auth\.uid\s*\(", pm.group(3)):
+                    continue
+                prel = next((k for k, v in sqls.items() if pm.group(0) in v), rel)
+                add("RLS-004", "critical", f"`{t}`: policy \"{pm.group(1)}\" lets users update their own row, including {', '.join(priv)} (self-promotion from the browser console)", prel, line_of(sqls[prel], sqls[prel].find(pm.group(0))), pm.group(0)[:80])
+                break
     # AUTH-002 / AUTH-003
     for rel, text in api_route_files(repo).items():
         if AUTH_RX.search(text) or "constructEvent" in text or re.search(r"webhook", rel, re.I):
@@ -507,7 +522,7 @@ def main():
                 "Full rule list: https://github.com/getshipready/ship-ready-skills"]
     else:
         out += [f"That was the quick scan: {len(CHECKS)} day-one checks for leaked keys, open data and unpaid upgrades.",
-                f"Ship-Ready Crew: {FULL_RULES - nrules} more checks (self-promotion to admin/Pro, client-only admin checks,",
+                f"Ship-Ready Crew: {FULL_RULES - nrules} more checks (client-only admin checks,",
                 "public storage buckets, Stripe price tampering and entitlements, deploy, performance, launch basics),",
                 "a ship score /100, a fix plan with patches, and Proof: Playwright launch tests for your money paths.",
                 "One-time $39, 10 agents.",

@@ -145,6 +145,30 @@ with tempfile.TemporaryDirectory() as _root:
         errs += [f"missing {x!r}" for x in must if x not in out] + [f"unexpected {x!r}" for x in mustnot if x in out]
         print(("ok   " if not errs else "FAIL ") + name + ("" if not errs else "  " + "; ".join(errs)))
         fails += bool(errs)
+# RLS-004 (own-row update policy on a table with role/plan/credits): fixtures are written at test time
+_T = "create table public.profiles (id uuid primary key references auth.users(id), display_name text, {extra});\nalter table public.profiles enable row level security;\n"
+_P = 'create policy "own row" on public.profiles for update using (auth.uid() = id);\n'
+_R4 = {
+    "bad": _T.format(extra="role text default 'user'") + _P,
+    "bad-plan-all": _T.format(extra="plan text, credits int") + 'create policy "own" on public.profiles for all using (auth.uid() = id);\n',
+    "good-grant": _T.format(extra="role text default 'user'") + _P + "revoke update on table public.profiles from anon, authenticated;\ngrant update (display_name) on table public.profiles to authenticated;\n",
+    "good-nopriv": _T.format(extra="bio text") + _P,
+}
+with tempfile.TemporaryDirectory() as _r4:
+    for _n, _sql in _R4.items():
+        os.makedirs(os.path.join(_r4, _n, "supabase", "migrations"))
+        open(os.path.join(_r4, _n, "supabase", "migrations", "001.sql"), "w").write(_sql)
+    for name, d, bad in [("rls004-bad-role", "bad", True), ("rls004-bad-plan-all", "bad-plan-all", True), ("rls004-good-column-grant", "good-grant", False), ("rls004-good-no-priv-column", "good-nopriv", False)]:
+        out = run(os.path.join(_r4, d)).stdout
+        errs = []
+        if bad and not ("RLS-004" in out and "[FAIL] 13." in out and "CRITICAL" in out): errs.append("RLS-004 critical not reported")
+        if not bad and ("RLS-004 " in out or "[FAIL] 13." in out or "[PASS] 13." not in out): errs.append("unexpected RLS-004 result")
+        print(("ok   " if not errs else "FAIL ") + name + ("" if not errs else "  " + "; ".join(errs)))
+        fails += bool(errs)
+    out = run(os.path.join(_r4, "bad")).stdout
+    errs = [x for x in ["self-promotion to admin/Pro"] if x in out] + (["not 44"] if "44 more checks" not in out else [])
+    print(("ok   " if not errs else "FAIL ") + "rls004-promo-text-44-more" + ("" if not errs else "  " + "; ".join(errs)))
+    fails += bool(errs)
 # --no-promo / SHIPREADY_NO_PROMO
 PROMO = [("promo-default-shows-crew", [], {}, True), ("promo-flag-hides", ["--no-promo"], {}, False),
          ("promo-env-hides", [], {"SHIPREADY_NO_PROMO": "1"}, False), ("promo-env-zero-shows", [], {"SHIPREADY_NO_PROMO": "0"}, True),
@@ -159,6 +183,6 @@ for name, extra, env, shows in PROMO:
     print(("ok   " if not errs else "FAIL ") + name + ("" if not errs else "  " + "; ".join(errs)))
     fails += bool(errs)
 PUBENV_N = 5
-total = len(CASES) + len(EXIT) + PUBENV_N + len(PROMO)
+total = len(CASES) + len(EXIT) + PUBENV_N + len(PROMO) + 5  # +5 RLS-004 checks
 print(f"\n{total - fails}/{total} passed")
 sys.exit(1 if fails else 0)

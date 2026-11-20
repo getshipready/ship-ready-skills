@@ -29,15 +29,15 @@ That's it: all 53 skills + the router. Now open your app folder and run:
 ```bash
 claude "Use ship-ready-start-here and check if this app is safe to launch"
 ```
-Want a first answer in seconds? Run the free quick scan (12 day-one checks, offline, no network calls):
+Want a first answer in seconds? Run the free quick scan (13 day-one checks, offline, no network calls):
 ```bash
 claude "Use ship-ready-quick-scan on this app"
 # or, without an agent (Python 3, standard library only):
 python3 skills/ship-ready-quick-scan/scripts/quickscan.py path/to/app
 ```
-Tests: `python3 skills/ship-ready-quick-scan/tests/run_tests.py` (64 tests: 57 fixtures + 7 exit-code and empty-folder checks).
+Tests: `python3 skills/ship-ready-quick-scan/tests/run_tests.py` (91 tests: fixtures, exit-code, empty-folder, public-env, no-promo and RLS-004 checks).
 
-What the 12 checks look for:
+What the 13 checks look for:
 1. **Leaked keys in your code**: Stripe keys, API keys or the Supabase `service_role` key committed to the repo.
 2. **`.env` not ignored**: `.env` isn't in `.gitignore`, so it can end up on GitHub.
 3. **Secrets in public env vars**: keys behind `NEXT_PUBLIC_`, `VITE_` or `EXPO_PUBLIC_` ship to every visitor's browser.
@@ -50,14 +50,16 @@ What the 12 checks look for:
 10. **Database functions a signed-out visitor can call**: turning RLS on doesn't cover database functions. A `security definer` function runs as its owner, and Postgres lets everyone call new functions by default, so anyone with your anon key can call it at `/rest/v1/rpc/<name>` unless you revoke `execute` from both `public` and `anon`. The quick scan flags these in your migrations (rule RLS-011, Supabase lint 0028), skips trigger functions and the ones check 9 already reports. Limits: it only reads migrations, and signed-in-only (`authenticated`) access isn't flagged. A schema-scoped `alter default privileges ... in schema public revoke ... from public` doesn't count as a fix for `public`; only the global form does.
 11. **Default grants that make every new table public again**: since Supabase's 30 Oct 2026 change, new tables get no Data API grants, and a common fix for "permission denied for table" is `alter default privileges ... grant ... on tables to anon, authenticated`. That re-exposes every table you create from then on, with or without RLS. The quick scan flags it (rule RLS-014), along with `grant ... on all tables in schema public to anon`, in your migrations, locally, with no code upload. Limits: regex-based, and a later `revoke` that cancels an earlier grant isn't tracked.
 12. **Roles read from `user_metadata`**: `user_metadata` is editable by any signed-in user (`supabase.auth.updateUser({ data })`), so a policy that checks `user_metadata.role` lets anyone make themselves admin. The policy part matches Supabase Advisor lint 0015 (`rls_references_user_metadata`); the quick scan also flags sign-up triggers and helper functions that take a role, plan or tenant from `user_metadata`, in your migrations, locally, with no code upload (rule AUTH-013, which is not in the Crew scanner yet). Limits: regex-based, and it only reads migrations; policies edited in the dashboard are not in the repo.
+13. **Users can edit their own role, plan or credits**: an own-row `update` policy (`auth.uid() = id`) limits which rows a user can change, not which columns, so a `profiles` row with `role`, `plan` or `credits` can be changed from the browser console unless column-level `grant update (...)` is used.
 
 ### Run it on every pull request
-Add `--fail-on=high` (or `--fail-on=critical`) and the scan exits with code 1 when it finds a blocker, so a CI check goes red. Without the flag, the exit code stays 0. Copy [examples/github-actions/ship-ready-quick-scan.yml](examples/github-actions/ship-ready-quick-scan.yml) to `.github/workflows/` in your app repo. It runs locally on the CI runner, no code upload, and pins the scanner to the `v0.2.7` tag.
+Add `--fail-on=high` (or `--fail-on=critical`) and the scan exits with code 1 when it finds a blocker, so a CI check goes red. Without the flag, the exit code stays 0. Copy [examples/github-actions/ship-ready-quick-scan.yml](examples/github-actions/ship-ready-quick-scan.yml) to `.github/workflows/` in your app repo. It runs locally on the CI runner, no code upload, and pins the scanner to the `v0.2.8` tag.
 ```bash
 python3 skills/ship-ready-quick-scan/scripts/quickscan.py . --fail-on=high
 ```
 
 ### Changelog
+- **v0.2.8**: new check 13 (RLS-004, critical): an own-row `for update` / `for all` policy using `auth.uid()` on a table with a `role`, `plan`, `credits`, `is_admin` or similar column, with no column-level `grant update (...)`. RLS limits which rows a user can edit, not which columns. Static heuristic; a PASS means the pattern was not found. Also: the closing note no longer lists self-promotion as a Crew-only check.
 - **v0.2.7**: new `--no-promo` flag (or env `SHIPREADY_NO_PROMO=1`) leaves out the closing note about the paid Crew and prints one link to the rule list instead. Findings and exit codes are unchanged.
 - **v0.2.6**: public-env check (SEC-003) now also flags provider keys behind browser prefixes (Resend, Gemini, Groq, Mistral, DeepSeek, OpenRouter, Replicate, ElevenLabs, SendGrid, Mailgun, Twilio, xAI, Perplexity, Cohere, any `STRIPE` name) and skips browser-safe names (publishable/anon keys, URLs, IDs, Mapbox, PostHog, Sentry DSN, Turnstile, reCAPTCHA); secret check catches Mapbox secret tokens (`sk.eyJ…`). The scan reads the files in your repo.
 - **v0.2.5**: secret check now catches Supabase `sb_secret_` keys (critical, they bypass RLS), real-format Resend keys (`re_xxxxxxxx_…`, previously missed), GitHub fine-grained tokens (`github_pat_`) and Groq keys (`gsk_`).
@@ -160,7 +162,7 @@ When to use → numbered steps → copy-paste commands/code → output format �
 |---|---|---|---|
 | Price | Free, MIT | $39 one-time | $129 per app |
 | What | 53 single-task skills | 10 named agents: Harbor (lead) + Sentinel, Warden, Keymaster, Tally, Pilot, Torque, Medic, Beacon, Proof | We run the Crew on your repo; a human reviews the result |
-| Scanner | free quick scan: 12 checks (14 of the 59 rules, plus AUTH-013) | 59-check offline scanner (59 rules) with file:line evidence, CI exit code | included |
+| Scanner | free quick scan: 13 checks (15 of the 59 rules, plus AUTH-013) | 59-check offline scanner (59 rules) with file:line evidence, CI exit code | included |
 | Output | your agent's notes | Ship score /100, verdict, findings JSON/MD, Excel scorecard, fix plan, patches | PDF + Markdown report, fix plan + patches, one re-scan |
 | Worked example | none | PromptPad: 0/100 → 99/100, 49 findings, full patch | your app |
 
