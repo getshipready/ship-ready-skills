@@ -20,7 +20,7 @@ sys.dont_write_bytecode = True  # write nothing, not even .pyc files
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sql001, rls011, rls014, auth013
 
-VERSION = "0.2.10"
+VERSION = "0.2.11"
 FULL_RULES = 59          # rule IDs in the full scanner (crew/shared/scripts/shipready_scan.py v1.0.0)
 SITE = "https://getshipready.github.io"
 SAMPLE_URL = SITE + "/sample"
@@ -536,6 +536,25 @@ NEW_KEY_RX = re.compile(r"sb_publishable_[0-9A-Za-z_\-]{6,}|sb_secret_[0-9A-Za-z
 GUIDE_LEGACY_KEYS = SITE + "/guides/supabase-legacy-api-keys-migration.html"
 
 
+HTTP_RX = re.compile(r"net\.http_(post|get)\s*\(", re.I)
+BEARER_RX = re.compile(r"'Authorization'\s*,\s*'Bearer\s", re.I)
+
+
+def key002(repo):
+    """KEY-002 (INFO, never fails a scan): SQL pg_net calls that send a key on 'Authorization: Bearer'.
+    Source: Supabase migration guide, section "Database Webhooks and pg_net"."""
+    notes = []
+    for rel, text in repo.files.items():
+        if not rel.endswith(".sql"):
+            continue
+        for m in HTTP_RX.finditer(text):
+            b = BEARER_RX.search(text[m.start(): m.start() + 1200])
+            if b:
+                notes.append(("KEY-002", rel, line_of(text, m.start() + b.start()),
+                    "pg_net call sends a key as 'Authorization: Bearer'. When you switch to an sb_secret_ key, send it on the 'apikey' header instead (secret keys aren't JWTs)."))
+    return notes
+
+
 def legacy_keys(repo):
     notes, seen = [], set()
     for rel, text in repo.files.items():
@@ -551,6 +570,7 @@ def legacy_keys(repo):
                 continue
             seen.add((rel, m.group(0)))
             notes.append(("KEY-001", rel, line_of(text, m.start()), f"reads legacy key variable `{m.group(0)}`"))
+    notes.extend(key002(repo))
     migrated = any(NEW_KEY_RX.search(t) for t in repo.files.values())
     return notes, migrated
 
@@ -558,7 +578,8 @@ def legacy_keys(repo):
 def render_legacy_keys(notes, migrated):
     if not notes:
         return []
-    out = ["[INFO] Supabase legacy API keys still in use  (KEY-001, not scored)"]
+    ids = sorted({n[0] for n in notes})
+    out = [("[INFO] Supabase legacy API keys still in use" if "KEY-001" in ids else "[INFO] Supabase key migration note") + f"  ({', '.join(ids)}, not scored)"]
     for _, rel, ln, msg in notes[:8]:
         out.append(f"   - INFO     {rel}:{ln}  {msg}")
     if len(notes) > 8:
@@ -666,7 +687,8 @@ def main():
             body.append("   Skipped: " + ("no Stripe usage found." if cid == "webhook" else "no SQL migrations in the repo; run the Lite skill `rls-quick-check` in the Supabase SQL editor."))
         body.append("")
     applicable = sum(1 for l in body if l.startswith("[PASS]") or l.startswith("[FAIL]"))
-    verdict = "NOTHING TO SCAN: no Supabase or app files were found in this folder (0 files read, no checks run)" if not repo.files else "DO NOT SHIP" if crit else ("FIX BEFORE LAUNCH" if high else f"NO DAY-ONE BLOCKERS FOUND ({len(CHECKS)} checks only)")
+    failed = sum(1 for l in body if l.startswith("[FAIL]"))
+    verdict = "NOTHING TO SCAN: no Supabase or app files were found in this folder (0 files read, no checks run)" if not repo.files else "DO NOT SHIP" if crit else ("FIX BEFORE LAUNCH" if high else (f"{failed} CHECK{'S' if failed != 1 else ''} FAILED: FIX BEFORE LAUNCH" if failed else f"NO DAY-ONE BLOCKERS FOUND ({len(CHECKS)} checks only)"))
     nrules = len({r for c in CHECKS for r in c[2] if r != "AUTH-013"})  # AUTH-013 is not in the Crew scanner yet
     info = render_legacy_keys(*legacy_keys(repo))
     if info:
@@ -676,7 +698,7 @@ def main():
         body.extend(tp + [""])
     out = [f"Ship-Ready Quick Scan v{VERSION} · free · {len(CHECKS)} checks ({nrules} of the {FULL_RULES} rules in the full Ship-Ready scanner, plus AUTH-013)",
            f"App: {os.path.basename(repo.root)} · {len(repo.files)} files read · offline, no network calls", "",
-           f"Result: {verdict} · {passed}/{applicable} checks passed · {crit} critical, {high} high", ""] + body
+           f"Result: {verdict} · {passed}/{applicable} checks passed · " + (f"{failed} failed, all rated below high" if failed and not (crit or high) else f"{crit} critical, {high} high"), ""] + body
     prompt_items = []
     for cid, title, rules, skill in CHECKS:
         hits = sorted((f for f in real if f["id"] in rules), key=lambda f: (f["file"] or "", f["line"] or 0))
