@@ -53,12 +53,13 @@ What the 13 checks look for:
 13. **Users can edit their own role, plan or credits**: an own-row `update` policy (`auth.uid() = id`) limits which rows a user can change, not which columns, so a `profiles` row with `role`, `plan` or `credits` can be changed from the browser console unless column-level `grant update (...)` is used.
 
 ### Run it on every pull request
-Add `--fail-on=high` (or `--fail-on=critical`) and the scan exits with code 1 when it finds a blocker, so a CI check goes red. Without the flag, the exit code stays 0. Copy [examples/github-actions/ship-ready-quick-scan.yml](examples/github-actions/ship-ready-quick-scan.yml) to `.github/workflows/` in your app repo. It runs locally on the CI runner, no code upload, and pins the scanner to the `v0.2.8` tag.
+Add `--fail-on=high` (or `--fail-on=critical`) and the scan exits with code 1 when it finds a blocker, so a CI check goes red. Without the flag, the exit code stays 0. Copy [examples/github-actions/ship-ready-quick-scan.yml](examples/github-actions/ship-ready-quick-scan.yml) to `.github/workflows/` in your app repo. It runs locally on the CI runner, no code upload, and pins the scanner to the `v0.2.9` tag.
 ```bash
 python3 skills/ship-ready-quick-scan/scripts/quickscan.py . --fail-on=high
 ```
 
 ### Changelog
+- **v0.2.9**: repo-file check fixes: a commented-out `enable row level security` no longer counts as enabling RLS; unquoted policy names and quoted `"schema"."table"` identifiers are parsed; AUTH-013 also matches `(select auth.jwt()) -> 'user_metadata'`; later migrations win for RLS enable/disable and policy create/drop; secret-key patterns require a token boundary so identifiers like `task-item-checkbox-wrapper` are not flagged. 97 tests.
 - **v0.2.8**: new check 13 (RLS-004, critical): an own-row `for update` / `for all` policy using `auth.uid()` on a table with a `role`, `plan`, `credits`, `is_admin` or similar column, with no column-level `grant update (...)`. RLS limits which rows a user can edit, not which columns. Static heuristic; a PASS means the pattern was not found. Also: the closing note no longer lists self-promotion as a Crew-only check.
 - **v0.2.7**: new `--no-promo` flag (or env `SHIPREADY_NO_PROMO=1`) leaves out the closing note about the paid Crew and prints one link to the rule list instead. Findings and exit codes are unchanged.
 - **v0.2.6**: public-env check (SEC-003) now also flags provider keys behind browser prefixes (Resend, Gemini, Groq, Mistral, DeepSeek, OpenRouter, Replicate, ElevenLabs, SendGrid, Mailgun, Twilio, xAI, Perplexity, Cohere, any `STRIPE` name) and skips browser-safe names (publishable/anon keys, URLs, IDs, Mapbox, PostHog, Sentry DSN, Turnstile, reCAPTCHA); secret check catches Mapbox secret tokens (`sk.eyJ…`). The scan reads the files in your repo.

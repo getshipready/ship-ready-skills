@@ -6,7 +6,7 @@ raw_user_meta_data. Stdlib, static, on migrations."""
 import re, os, sys
 POLICY_RX = re.compile(r"\bcreate\s+policy\b[^;]*;", re.I | re.S)
 FUNC_RX = re.compile(r"\bcreate\s+(?:or\s+replace\s+)?function\b.*?(?:\$\w*\$).*?(?:\$\w*\$)[^;]*;", re.I | re.S)
-META_RX = re.compile(r"(auth\.jwt\(\)\s*->+\s*'user_metadata'|request\.jwt\.claims[^;]*user_metadata|raw_user_meta_data|user_metadata\s*->>?\s*'(role|is_admin|admin|plan|tier|org_id|tenant_id|team_id))", re.I)
+META_RX = re.compile(r"((?:\(\s*select\s+auth\.jwt\(\)\s*\)|auth\.jwt\(\))\s*->+\s*'user_metadata'|request\.jwt\.claims[^;]*user_metadata|raw_user_meta_data|user_metadata\s*->>?\s*'(role|is_admin|admin|plan|tier|org_id|tenant_id|team_id))", re.I)
 def _line(text, pos):
     return text.count("\n", 0, pos) + 1
 def find(sql_files):

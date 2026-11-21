@@ -19,7 +19,7 @@ import base64, json, os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sql001, rls011, rls014, auth013
 
-VERSION = "0.2.8"
+VERSION = "0.2.9"
 FULL_RULES = 59          # rule IDs in the full scanner (crew/shared/scripts/shipready_scan.py v1.0.0)
 SITE = "https://getshipready.github.io"
 SAMPLE_URL = SITE + "/sample"
@@ -182,20 +182,23 @@ def verify_jwt_findings(repo):
     return F
 
 
+# Require a token boundary so prefixes are not matched inside identifiers
+# (e.g. "task-item-checkbox-wrapper" is not an OpenAI key).
+_B = r"(?<![A-Za-z0-9_-])"
 SECRET_PATTERNS = [
-    (r"sk_live_[0-9A-Za-z]{10,}", "Stripe LIVE secret key", "critical"),
-    (r"rk_live_[0-9A-Za-z]{10,}", "Stripe LIVE restricted key", "critical"),
-    (r"sk_test_[0-9A-Za-z]{10,}", "Stripe test secret key", "high"),
-    (r"whsec_[0-9A-Za-z]{10,}", "Stripe webhook signing secret", "high"),
-    (r"sk-(?:proj-|ant-)?[0-9A-Za-z_\-]{20,}", "OpenAI/Anthropic API key", "critical"),
-    (r"AKIA[0-9A-Z]{16}", "AWS access key ID", "critical"),
-    (r"gh[pousr]_[0-9A-Za-z]{30,}", "GitHub token", "critical"),
-    (r"xox[abposr]-[0-9A-Za-z\-]{10,}", "Slack token", "high"),
-    (r"re_[0-9A-Za-z]{8}_[0-9A-Za-z]{24}(?![0-9A-Za-z_])|re_[0-9A-Za-z]{20,}", "Resend API key", "high"),
-    (r"sb_secret_[0-9A-Za-z_\-]{20,}", "Supabase secret key (sb_secret_, bypasses RLS)", "critical"),
-    (r"github_pat_[0-9A-Za-z_]{50,}", "GitHub fine-grained token", "critical"),
-    (r"gsk_[0-9A-Za-z]{40,}", "Groq API key", "high"),
-    (r"sk\.eyJ[0-9A-Za-z_\-]{20,}\.[0-9A-Za-z_\-]{10,}", "Mapbox secret token (sk.)", "high"),
+    (_B + r"sk_live_[0-9A-Za-z]{10,}", "Stripe LIVE secret key", "critical"),
+    (_B + r"rk_live_[0-9A-Za-z]{10,}", "Stripe LIVE restricted key", "critical"),
+    (_B + r"sk_test_[0-9A-Za-z]{10,}", "Stripe test secret key", "high"),
+    (_B + r"whsec_[0-9A-Za-z]{10,}", "Stripe webhook signing secret", "high"),
+    (_B + r"sk-(?:proj-|ant-)?[0-9A-Za-z_\-]{20,}", "OpenAI/Anthropic API key", "critical"),
+    (_B + r"AKIA[0-9A-Z]{16}", "AWS access key ID", "critical"),
+    (_B + r"gh[pousr]_[0-9A-Za-z]{30,}", "GitHub token", "critical"),
+    (_B + r"xox[abposr]-[0-9A-Za-z\-]{10,}", "Slack token", "high"),
+    (_B + r"re_[0-9A-Za-z]{8}_[0-9A-Za-z]{24}(?![0-9A-Za-z_])|" + _B + r"re_[0-9A-Za-z]{20,}", "Resend API key", "high"),
+    (_B + r"sb_secret_[0-9A-Za-z_\-]{20,}", "Supabase secret key (sb_secret_, bypasses RLS)", "critical"),
+    (_B + r"github_pat_[0-9A-Za-z_]{50,}", "GitHub fine-grained token", "critical"),
+    (_B + r"gsk_[0-9A-Za-z]{40,}", "Groq API key", "high"),
+    (_B + r"sk\.eyJ[0-9A-Za-z_\-]{20,}\.[0-9A-Za-z_\-]{10,}", "Mapbox secret token (sk.)", "high"),
     (r"-----BEGIN (?:RSA |EC )?PRIVATE KEY-----", "Private key", "critical"),
 ]
 JWT_RX = re.compile(r"eyJ[0-9A-Za-z_\-]+\.(eyJ[0-9A-Za-z_\-]+)\.[0-9A-Za-z_\-]+")
@@ -215,11 +218,124 @@ def gitignored_env(repo):
     return bool(re.search(r"^\s*\.env(\*|\..*|\s*$)", gi, re.M) or re.search(r"^\s*\*\.env", gi, re.M))
 
 
+def strip_sql_comments(text):
+    """Replace SQL `--` and `/* */` comments with spaces; keep newlines so line numbers stay valid."""
+    out = []
+    i, n = 0, len(text)
+    while i < n:
+        ch = text[i]
+        if ch == "$":
+            m = re.match(r"\$[A-Za-z0-9_]*\$", text[i:])
+            if m:
+                tag = m.group(0)
+                end = text.find(tag, i + len(tag))
+                if end == -1:
+                    out.append(text[i:])
+                    break
+                out.append(text[i:end + len(tag)])
+                i = end + len(tag)
+                continue
+        if ch == "'":
+            j = i + 1
+            while j < n:
+                if text[j] == "'":
+                    if j + 1 < n and text[j + 1] == "'":
+                        j += 2
+                        continue
+                    j += 1
+                    break
+                j += 1
+            out.append(text[i:j])
+            i = j
+            continue
+        if ch in "eE" and i + 1 < n and text[i + 1] == "'" and (i == 0 or not (text[i - 1].isalnum() or text[i - 1] == "_")):
+            j = i + 2
+            while j < n:
+                if text[j] == "\\":
+                    j += 2
+                    continue
+                if text[j] == "'":
+                    if j + 1 < n and text[j + 1] == "'":
+                        j += 2
+                        continue
+                    j += 1
+                    break
+                j += 1
+            out.append(text[i:j])
+            i = j
+            continue
+        if ch == '"':
+            j = i + 1
+            while j < n:
+                if text[j] == '"':
+                    if j + 1 < n and text[j + 1] == '"':
+                        j += 2
+                        continue
+                    j += 1
+                    break
+                j += 1
+            out.append(text[i:j])
+            i = j
+            continue
+        if ch == "-" and i + 1 < n and text[i + 1] == "-":
+            j = i
+            while j < n and text[j] != "\n":
+                j += 1
+            out.append(" " * (j - i))
+            i = j
+            continue
+        if ch == "/" and i + 1 < n and text[i + 1] == "*":
+            j = text.find("*/", i + 2)
+            if j == -1:
+                out.append("".join("\n" if c == "\n" else " " for c in text[i:]))
+                break
+            chunk = text[i:j + 2]
+            out.append("".join("\n" if c == "\n" else " " for c in chunk))
+            i = j + 2
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+# Optional schema ("public". / public.) plus a quoted or unquoted identifier
+_IDENT = r'(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_]*))'
+_QTABLE = r'(?:(?:"public"|public)\s*\.\s*)?' + _IDENT
+
+
+def _ident(*values):
+    for v in values:
+        if v:
+            return v.lower()
+    return None
+
+
 def parse_tables(sql_text):
     tables = {}
-    for m in re.finditer(r"create\s+table\s+(?:if\s+not\s+exists\s+)?((?:public\.)?\"?([a-zA-Z0-9_]+)\"?)\s*\((.*?)\);", sql_text, re.I | re.S):
-        tables[m.group(2).lower()] = {"cols": m.group(3), "idx": m.start()}
+    for m in re.finditer(r"create\s+table\s+(?:if\s+not\s+exists\s+)?" + _QTABLE + r"\s*\((.*?)\);", sql_text, re.I | re.S):
+        tables[_ident(m.group(1), m.group(2))] = {"cols": m.group(3), "idx": m.start()}
     return tables
+
+
+CREATE_POLICY_RX = re.compile(
+    r"create\s+policy\s+" + _IDENT + r"\s+on\s+" + _QTABLE +
+    r"\s*(?:as\s+\w+\s*)?(?:for\s+(select|insert|update|delete|all)\b)?\s*"
+    r"(?:to\s+[\w ,]+?(?=\s+(?:using|with)\b|\s*;))?(.*?);",
+    re.I | re.S)
+DROP_POLICY_RX = re.compile(
+    r"drop\s+policy\s+(?:if\s+exists\s+)?" + _IDENT + r"\s+on\s+" + _QTABLE,
+    re.I)
+ALTER_RLS_RX = re.compile(
+    r"alter\s+table\s+(?:if\s+exists\s+)?" + _QTABLE + r"\s+(enable|disable)\s+row\s+level\s+security",
+    re.I)
+
+
+def _policy_name(m):
+    return _ident(m.group(1), m.group(2))
+
+
+def _policy_table(m):
+    return _ident(m.group(3), m.group(4))
 
 
 def scan(repo):
@@ -275,25 +391,64 @@ def scan(repo):
                 continue
             seen_vars.add(m.group(0))
             add("SEC-003", "critical", f"Secret exposed to the browser: {m.group(0)}", rel, line_of(text, m.start()), m.group(0))
-    # RLS-001 / RLS-002
-    sqls = repo.sql()
-    alltext = "\n".join(sqls.values())
+    # RLS-001 / RLS-002 / RLS-007: comments stripped, identifiers quoted or not,
+    # later migrations win (evaluate enable/disable and policy create/drop in filename order)
+    sqls = {rel: strip_sql_comments(text) for rel, text in repo.sql().items()}
+    ordered = sorted(sqls.items(), key=lambda kv: kv[0].replace(os.sep, "/"))
+    alltext = "\n".join(text for _, text in ordered)
+    tables = {}
+    rls_on = {}
+    rls_last = {}
+    policies = {}
+    for rel, text in ordered:
+        for m in re.finditer(r"create\s+table\s+(?:if\s+not\s+exists\s+)?" + _QTABLE + r"\s*\((.*?)\);", text, re.I | re.S):
+            t = _ident(m.group(1), m.group(2))
+            tables[t] = {"cols": m.group(3), "file": rel, "idx": m.start()}
+        events = []
+        for m in ALTER_RLS_RX.finditer(text):
+            events.append((m.start(), "rls", m))
+        for m in CREATE_POLICY_RX.finditer(text):
+            events.append((m.start(), "create_pol", m))
+        for m in DROP_POLICY_RX.finditer(text):
+            events.append((m.start(), "drop_pol", m))
+        for _, kind, m in sorted(events, key=lambda e: e[0]):
+            if kind == "rls":
+                t = _ident(m.group(1), m.group(2))
+                act = m.group(3).lower()
+                rls_on[t] = act == "enable"
+                rls_last[t] = {"file": rel, "line": line_of(text, m.start()), "ev": m.group(0)[:80], "action": act}
+            elif kind == "create_pol":
+                t = _policy_table(m)
+                policies[(t, _policy_name(m))] = {
+                    "op": (m.group(5) or "all").lower(),
+                    "body": m.group(6) or "",
+                    "file": rel,
+                    "line": line_of(text, m.start()),
+                }
+            else:
+                policies.pop((_policy_table(m), _policy_name(m)), None)
+    for t, info in tables.items():
+        if rls_on.get(t):
+            continue
+        last = rls_last.get(t)
+        if last and last["action"] == "disable":
+            add("RLS-007", "critical", f"Migration turns Row Level Security OFF on `{t}`", last["file"], last["line"], last["ev"])
+        else:
+            add("RLS-001", "critical", f"Table `{t}` has Row Level Security disabled", info["file"], line_of(sqls[info["file"]], info["idx"]), f"create table {t} …")
+    for t, last in rls_last.items():
+        if t not in tables and last["action"] == "disable":
+            add("RLS-007", "critical", f"Migration turns Row Level Security OFF on `{t}`", last["file"], last["line"], last["ev"])
+    for (t, name), pol in policies.items():
+        if t not in tables or pol["op"] not in ("select", "all"):
+            continue
+        if not re.search(r"using\s*\(\s*true\s*\)", pol["body"], re.I):
+            continue
+        info = tables[t]
+        sens = SENSITIVE_COLS.findall(info["cols"])
+        sev = "critical" if any(s.lower() in ("email", "phone", "address", "password", "token") for s in sens) else ("high" if sens else "medium")
+        add("RLS-002", sev, f"`{t}`: policy \"{name}\" lets anyone read every row" + (f" (incl. {', '.join(sorted(set(s.lower() for s in sens)))})" if sens else ""), pol["file"], pol["line"], "using (true)")
+    # RLS-010 (same regexes as the full scanner)
     for rel, text in sqls.items():
-        for t, info in parse_tables(text).items():
-            if not re.search(rf"alter\s+table\s+(?:public\.)?\"?{t}\"?\s+enable\s+row\s+level\s+security", alltext, re.I):
-                add("RLS-001", "critical", f"Table `{t}` has Row Level Security disabled", rel, line_of(text, info["idx"]), f"create table {t} …")
-            for pm in re.finditer(rf"create\s+policy\s+\"([^\"]+)\"\s+on\s+(?:public\.)?{t}\s+(?:as\s+\w+\s+)?for\s+(select|insert|update|delete|all)\s*(?:to\s+[\w ,]+?(?=\s+(?:using|with)\b|\s*;))?(.*?);", alltext, re.I | re.S):
-                name, op, body = pm.group(1), pm.group(2).lower(), pm.group(3)
-                if op in ("select", "all") and re.search(r"using\s*\(\s*true\s*\)", body, re.I):
-                    prel = next((k for k, v in sqls.items() if pm.group(0) in v), rel)
-                    pln = line_of(sqls[prel], sqls[prel].find(pm.group(0)))
-                    sens = SENSITIVE_COLS.findall(info["cols"])
-                    sev = "critical" if any(s.lower() in ("email", "phone", "address", "password", "token") for s in sens) else ("high" if sens else "medium")
-                    add("RLS-002", sev, f"`{t}`: policy \"{name}\" lets anyone read every row" + (f" (incl. {', '.join(sorted(set(s.lower() for s in sens)))})" if sens else ""), prel, pln, "using (true)")
-    # RLS-007 / RLS-010 (same regexes as the full scanner)
-    for rel, text in sqls.items():
-        for m in re.finditer(r"alter\s+table\s+(?:if\s+exists\s+)?(?:public\.)?\"?(\w+)\"?\s+disable\s+row\s+level\s+security", text, re.I):
-            add("RLS-007", "critical", f"Migration turns Row Level Security OFF on `{m.group(1)}`", rel, line_of(text, m.start()), m.group(0)[:80])
         for m in re.finditer(r"create\s+(?:or\s+replace\s+)?view\s+(?:public\.)?\"?(\w+)\"?\s*(with\s*\([^)]*\))?\s+as", text, re.I):
             v, opts = m.group(1), m.group(2) or ""
             if re.search(r"security_invoker\s*=\s*(true|on)", opts, re.I) or re.search(rf"alter\s+view\s+(?:public\.)?\"?{v}\"?\s+set\s*\(\s*security_invoker\s*=\s*(true|on)", alltext, re.I):

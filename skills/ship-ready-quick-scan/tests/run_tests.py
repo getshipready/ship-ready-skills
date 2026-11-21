@@ -74,6 +74,12 @@ CASES = {
     "usermeta-f6": ("FIX BEFORE LAUNCH", ["AUTH-013", "[FAIL] 12."], []),
     "usermeta-f7": ("DO NOT SHIP", ["AUTH-013", "[FAIL] 12."], []),
     "usermeta-f8": ("NO DAY-ONE BLOCKERS", ["[PASS] 12."], ["[FAIL]"]),
+    "e234-f1-commented-enable": ("DO NOT SHIP", ["RLS-001", "[FAIL] 4."], []),
+    "e234-f2-unquoted-policy": ("DO NOT SHIP", ["RLS-002", "[FAIL] 5."], []),
+    "e234-f3-quoted-schema": ("DO NOT SHIP", ["RLS-001", "[FAIL] 4."], []),
+    "e234-f4-jwt-wrapper": ("DO NOT SHIP", ["AUTH-013", "[FAIL] 12."], []),
+    "e234-f5-rls-reenabled": ("NO DAY-ONE BLOCKERS", [], ["[FAIL]"]),
+    "e234-f6-sk-in-identifier": ("NO DAY-ONE BLOCKERS", [], ["[FAIL]", "OpenAI/Anthropic"]),
 }
 # key002-newkeys holds fake keys in real formats. It is written at test time so GitHub
 # push protection doesn't treat the fixture as a leaked secret.
