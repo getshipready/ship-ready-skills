@@ -16,10 +16,11 @@ What it is not: a penetration test or proof of safety. A clean quick scan means 
 13 checks found anything", nothing more. Secrets are redacted in all output. Nothing is sent anywhere.
 """
 import base64, json, os, re, sys
+sys.dont_write_bytecode = True  # write nothing, not even .pyc files
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sql001, rls011, rls014, auth013
 
-VERSION = "0.2.9"
+VERSION = "0.2.10"
 FULL_RULES = 59          # rule IDs in the full scanner (crew/shared/scripts/shipready_scan.py v1.0.0)
 SITE = "https://getshipready.github.io"
 SAMPLE_URL = SITE + "/sample"
@@ -27,7 +28,8 @@ CREW_URL = SITE + "/crew"
 SKIP_DIRS = {"node_modules", ".next", ".git", "dist", "build", ".vercel", ".turbo", "coverage", ".svelte-kit", "out",
              ".claude", ".cursor", ".agents", "playwright-report", "test-results", ".auth", ".ship-ready"}
 CODE_EXT = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".vue", ".svelte"}
-TEXT_EXT = CODE_EXT | {".sql", ".json", ".env", ".md", ".html", ".toml", ".yaml", ".yml", ".txt"}
+TEXT_EXT = CODE_EXT | {".sql", ".json", ".env", ".md", ".html", ".toml", ".yaml", ".yml", ".txt", ".py"}
+LOCKFILES = {"package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "bun.lock", "composer.lock", "poetry.lock", "pipfile.lock", "deno.lock", "cargo.lock", "uv.lock"}
 SEV_ORDER = {"critical": 4, "high": 3, "medium": 2, "low": 1}
 
 # check id -> (title, rule ids, free Lite skill that fixes it)
@@ -78,6 +80,8 @@ class Repo:
                 p = os.path.join(d, f)
                 rel = os.path.relpath(p, self.root)
                 ext = os.path.splitext(f)[1].lower()
+                if f.lower() in LOCKFILES:
+                    continue
                 if ext in TEXT_EXT or f.startswith(".env") or f in (".gitignore", ".nvmrc", "vercel.json"):
                     try:
                         if os.path.getsize(p) > 1_500_000:
@@ -121,6 +125,25 @@ def api_route_files(repo):
 
 
 AUTH_RX = re.compile(r"auth\.getUser\(|getUser\(|getServerSession|auth\(\)|currentUser\(|getAuth\(|verifyIdToken|jwt\.verify|requireUser|withAuth|clerkClient|getToken\(|validateRequest|lucia|get\w*(?:User|Session)\(|verify\w*Token\(|exchangeOAuthCode|exchangeCodeForSession|from ['\"]inngest/next['\"]", re.I)
+
+HANDLER_RX = re.compile(r"export\s+(?:async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b|export\s+const\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b")
+
+
+def route_segments(rel, text):
+    """Next.js app-router route.ts: judge each exported handler on its own. A shared preamble
+    (imports, helpers before the first handler) counts for every handler. Other files: whole file."""
+    if not re.search(r"(^|/)app/api/.+/route\.(t|j)sx?$", rel.replace(os.sep, "/")):
+        return [text]
+    ms = list(HANDLER_RX.finditer(text))
+    if len(ms) < 2:
+        return [text]
+    pre = re.sub(r"(?m)^\s*import\b.*$", "", text[:ms[0].start()])  # an import alone is not a check
+    segs = []
+    for i, m in enumerate(ms):
+        end = ms[i + 1].start() if i + 1 < len(ms) else len(text)
+        segs.append(pre + text[m.start():end] if AUTH_RX.search(pre) else text[m.start():end])
+    return segs
+
 
 FN_SECTION_RX = re.compile(r"^\s*\[functions\.([A-Za-z0-9_\-]+)\]\s*$", re.M)
 VERIFY_JWT_OFF_RX = re.compile(r"^\s*verify_jwt\s*=\s*false\b", re.M)
@@ -481,14 +504,17 @@ def scan(repo):
                 break
     # AUTH-002 / AUTH-003
     for rel, text in api_route_files(repo).items():
-        if AUTH_RX.search(text) or "constructEvent" in text or re.search(r"webhook", rel, re.I):
+        if "constructEvent" in text or re.search(r"webhook", rel, re.I):
             continue
-        writes = re.search(r"\.(delete|update|insert|upsert)\(|DELETE|PUT|PATCH", text)
-        reads = re.search(r"\.select\(|findMany|SELECT", text)
-        if writes:
-            add("AUTH-002", "critical", "API route changes data without checking who is calling", rel, line_of(text, writes.start()), writes.group(0))
-        elif reads:
-            add("AUTH-003", "high", "API route returns data without authentication", rel, line_of(text, reads.start()), reads.group(0))
+        for seg in route_segments(rel, text):
+            if AUTH_RX.search(seg):
+                continue
+            writes = re.search(r"\.(delete|update|insert|upsert)\(|DELETE|PUT|PATCH", seg)
+            reads = re.search(r"\.select\(|findMany|SELECT", seg)
+            if writes:
+                add("AUTH-002", "critical", "API route changes data without checking who is calling", rel, line_of(text, text.find(seg) + writes.start()), writes.group(0))
+            elif reads:
+                add("AUTH-003", "high", "API route returns data without authentication", rel, line_of(text, text.find(seg) + reads.start()), reads.group(0))
     # AUTH-010: supabase/config.toml verify_jwt = false
     for rid, sev, rel, line, msg in verify_jwt_findings(repo):
         add(rid, sev, msg, rel, line, "verify_jwt = false")

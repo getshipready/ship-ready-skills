@@ -5,6 +5,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 QS = os.path.join(HERE, "..", "scripts", "quickscan.py")
 # fixture: (expected verdict prefix, strings that must appear, strings that must NOT appear)
 CASES = {
+    "route-perhandler-bad": ("DO NOT SHIP", ["AUTH-002", "[FAIL] 7."], []),
+    "route-perhandler-good": ("NO DAY-ONE BLOCKERS", ["[PASS] 7."], ["[FAIL]"]),
+    "route-preamble-auth": ("NO DAY-ONE BLOCKERS", ["[PASS] 7."], ["[FAIL]"]),
+    "secrets-py-toml-yml": ("DO NOT SHIP", ["SEC-001", "b.py", "config.toml", "ci.yml"], []),
+    "secrets-lockfile-clean": ("NO DAY-ONE BLOCKERS", ["[PASS] 1."], ["[FAIL]"]),
     "key002-bad": ("FIX BEFORE LAUNCH", ["SEC-001", "Resend API key"], []),
     "key002-good": ("NO DAY-ONE BLOCKERS", [], ["[FAIL]"]),
     "key002-newkeys": ("DO NOT SHIP", ["SEC-001", "sb_secret_", "GitHub fine-grained token", "Groq API key"], []),
@@ -188,7 +193,16 @@ for name, extra, env, shows in PROMO:
     if not shows and "Full rule list: https://github.com/getshipready/ship-ready-skills" not in out: errs.append("neutral line missing")
     print(("ok   " if not errs else "FAIL ") + name + ("" if not errs else "  " + "; ".join(errs)))
     fails += bool(errs)
+# writes nothing: no __pycache__/.pyc after a run from a clean copy
+import shutil, tempfile
+_tmp = tempfile.mkdtemp()
+_sc = os.path.join(_tmp, "scripts"); shutil.copytree(os.path.join(HERE, "..", "scripts"), _sc, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+subprocess.run([sys.executable, os.path.join(_sc, "quickscan.py"), FX("key002-good"), "--no-promo"], capture_output=True, text=True, env={k: v for k, v in os.environ.items() if k != "PYTHONDONTWRITEBYTECODE"})
+_pyc = [os.path.join(d, f) for d, _, fs in os.walk(_tmp) for f in fs if f.endswith(".pyc")]
+print(("ok   " if not _pyc else "FAIL ") + "writes-no-bytecode" + ("" if not _pyc else "  " + ", ".join(_pyc)))
+fails += bool(_pyc)
+shutil.rmtree(_tmp, ignore_errors=True)
 PUBENV_N = 5
-total = len(CASES) + len(EXIT) + PUBENV_N + len(PROMO) + 5  # +5 RLS-004 checks
+total = len(CASES) + len(EXIT) + PUBENV_N + len(PROMO) + 5 + 1  # +5 RLS-004 checks, +1 bytecode
 print(f"\n{total - fails}/{total} passed")
 sys.exit(1 if fails else 0)
